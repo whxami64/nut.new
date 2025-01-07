@@ -22,6 +22,8 @@ import { useSettings } from '~/lib/hooks/useSettings';
 import type { ProviderInfo } from '~/types/model';
 import { useSearchParams } from '@remix-run/react';
 import { createSampler } from '~/utils/sampler';
+import { saveProjectPrompt } from './Messages.client';
+import { uint8ArrayToBase64 } from '../workbench/ReplayProtocolClient';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -314,6 +316,14 @@ export const ChatImpl = memo(
       resetEnhancer();
 
       textareaRef.current?.blur();
+
+      // The project contents are associated with the last message present when
+      // the user message is added.
+      const lastMessage = messages[messages.length - 1];
+      const { content, uniqueProjectName } = await workbenchStore.generateZip();
+      const buf = await content.arrayBuffer();
+      const contentBase64 = uint8ArrayToBase64(new Uint8Array(buf));
+      saveProjectPrompt(lastMessage.id, { content: contentBase64, uniqueProjectName, input: _input });
     };
 
     /**

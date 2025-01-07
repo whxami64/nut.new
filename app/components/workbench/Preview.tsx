@@ -3,7 +3,9 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { IconButton } from '~/components/ui/IconButton';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { PortDropdown } from './PortDropdown';
-import { ScreenshotSelector } from './ScreenshotSelector';
+import { PointSelector } from './PointSelector';
+import { saveReplayRecording } from './Recording';
+import { assert } from './ReplayProtocolClient';
 
 type ResizeSide = 'left' | 'right' | null;
 
@@ -22,6 +24,14 @@ export const Preview = memo(() => {
   const [url, setUrl] = useState('');
   const [iframeUrl, setIframeUrl] = useState<string | undefined>();
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectionPoint, setSelectionPoint] = useState<{ x: number; y: number } | null>(null);
+  // Once a recording has been saved, the preview can no longer be interacted with.
+  // Reloading the preview or regenerating it after code changes will reset this.
+  const [recordingSaved, setRecordingSaved] = useState(false);
+
+  // The ID of the recording that was created. If a recording has been saved but
+  // no ID is set, the recording is still being created.
+  const [recordingId, setRecordingId] = useState<string | undefined>();
 
   // Toggle between responsive mode and device mode
   const [isDeviceModeOn, setIsDeviceModeOn] = useState(false);
@@ -53,21 +63,46 @@ export const Preview = memo(() => {
     setIframeUrl(baseUrl);
   }, [activePreview]);
 
+  // Trim any long base URL from the start of the provided URL.
+  const displayUrl = (url: string) => {
+    if (!activePreview) {
+      return url;
+    }
+
+    const { baseUrl } = activePreview;
+
+    if (url.startsWith(baseUrl)) {
+      const trimmedUrl = url.slice(baseUrl.length);
+      if (trimmedUrl.startsWith('/')) {
+        return trimmedUrl;
+      }
+      return "/" + trimmedUrl;
+    }
+
+    return url;
+  }
+
   const validateUrl = useCallback(
     (value: string) => {
       if (!activePreview) {
-        return false;
+        return null;
       }
 
       const { baseUrl } = activePreview;
 
       if (value === baseUrl) {
-        return true;
+        return value;
       } else if (value.startsWith(baseUrl)) {
-        return ['/', '?', '#'].includes(value.charAt(baseUrl.length));
+        if (['/', '?', '#'].includes(value.charAt(baseUrl.length))) {
+          return value;
+        }
       }
 
-      return false;
+      if (value.startsWith('/')) {
+        return baseUrl + value;
+      }
+
+      return null;
     },
     [activePreview],
   );
@@ -213,6 +248,16 @@ export const Preview = memo(() => {
     </div>
   );
 
+  const beginSaveRecording = () => {
+    assert(!recordingSaved);
+    setRecordingSaved(true);
+
+    assert(iframeRef.current);
+    saveReplayRecording(iframeRef.current).then((id) => {
+      setRecordingId(id);
+    });
+  };
+
   return (
     <div ref={containerRef} className="w-full h-full flex flex-col relative">
       {isPortDropdownOpen && (
@@ -220,11 +265,20 @@ export const Preview = memo(() => {
       )}
       <div className="bg-bolt-elements-background-depth-2 p-2 flex items-center gap-1.5">
         <IconButton icon="i-ph:arrow-clockwise" onClick={reloadPreview} />
-        <IconButton
-          icon="i-ph:selection"
-          onClick={() => setIsSelectionMode(!isSelectionMode)}
-          className={isSelectionMode ? 'bg-bolt-elements-background-depth-3' : ''}
-        />
+        {!recordingSaved && (
+          <IconButton
+            icon="i-ph:record-fill"
+            onClick={beginSaveRecording}
+            style={{ color: 'red' }}
+          />
+        )}
+        {recordingSaved && (
+          <IconButton
+            icon="i-ph:cursor-click"
+            onClick={() => setIsSelectionMode(!isSelectionMode)}
+            className={isSelectionMode ? 'bg-bolt-elements-background-depth-3' : ''}
+          />
+        )}
         <div
           className="flex items-center gap-1 flex-grow bg-bolt-elements-preview-addressBar-background border border-bolt-elements-borderColor text-bolt-elements-preview-addressBar-text rounded-full px-3 py-1 text-sm hover:bg-bolt-elements-preview-addressBar-backgroundHover hover:focus-within:bg-bolt-elements-preview-addressBar-backgroundActive focus-within:bg-bolt-elements-preview-addressBar-backgroundActive
         focus-within-border-bolt-elements-borderColorActive focus-within:text-bolt-elements-preview-addressBar-textActive"
@@ -234,13 +288,14 @@ export const Preview = memo(() => {
             ref={inputRef}
             className="w-full bg-transparent outline-none"
             type="text"
-            value={url}
+            value={displayUrl(url)}
             onChange={(event) => {
               setUrl(event.target.value);
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && validateUrl(url)) {
-                setIframeUrl(url);
+              let newUrl;
+              if (event.key === 'Enter' && (newUrl = validateUrl(url))) {
+                setIframeUrl(newUrl);
 
                 if (inputRef.current) {
                   inputRef.current.blur();
@@ -296,9 +351,12 @@ export const Preview = memo(() => {
                 src={iframeUrl}
                 allowFullScreen
               />
-              <ScreenshotSelector
+              <PointSelector
                 isSelectionMode={isSelectionMode}
+                recordingSaved={recordingSaved}
                 setIsSelectionMode={setIsSelectionMode}
+                selectionPoint={selectionPoint}
+                setSelectionPoint={setSelectionPoint}
                 containerRef={iframeRef}
               />
             </>
