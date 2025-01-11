@@ -1,8 +1,8 @@
 // Manage state around recording Preview behavior for generating a Replay recording.
 
-import { assert, sendCommandDedicatedClient, stringToBase64, uint8ArrayToBase64 } from "./ReplayProtocolClient";
+import { assert, stringToBase64, uint8ArrayToBase64 } from "./ReplayProtocolClient";
 
-interface RerecordResource {
+export interface SimulationResource {
   url: string;
   requestBodyBase64: string;
   responseBodyBase64: string;
@@ -10,14 +10,14 @@ interface RerecordResource {
   responseHeaders: Record<string, string>;
 }
 
-enum RerecordInteractionKind {
+enum SimulationInteractionKind {
   Click = "click",
   DblClick = "dblclick",
   KeyDown = "keydown",
 }
 
-export interface RerecordInteraction {
-  kind: RerecordInteractionKind;
+export interface SimulationInteraction {
+  kind: SimulationInteractionKind;
 
   // Elapsed time when the interaction occurred.
   time: number;
@@ -51,7 +51,7 @@ interface LocalStorageAccess {
   value?: string;
 }
 
-interface RerecordData {
+export interface SimulationData {
   // Contents of window.location.href.
   locationHref: string;
 
@@ -59,10 +59,10 @@ interface RerecordData {
   documentUrl: string;
 
   // All resources accessed.
-  resources: RerecordResource[];
+  resources: SimulationResource[];
 
   // All user interactions made.
-  interactions: RerecordInteraction[];
+  interactions: SimulationInteraction[];
 
   // All indexedDB accesses made.
   indexedDBAccesses?: IndexedDBAccess[];
@@ -71,106 +71,63 @@ interface RerecordData {
   localStorageAccesses?: LocalStorageAccess[];
 }
 
-// This is in place to workaround some insane behavior where messages are being
-// sent by iframes running older versions of the recording data logic, even after
-// quitting and restarting the entire browser. Maybe related to webcontainers?
-const RecordingDataVersion = 2;
+// Our message event listener can trigger on messages from iframes we don't expect.
+// This is a unique ID for the last time we injected the recording message handler
+// logic into an iframe. We will ignore messages from other injected handlers.
+let gLastMessageHandlerId = "";
 
-export async function saveReplayRecording(iframe: HTMLIFrameElement) {
+export async function getIFrameSimulationData(iframe: HTMLIFrameElement): Promise<SimulationData> {
   assert(iframe.contentWindow);
   iframe.contentWindow.postMessage({ source: "recording-data-request" }, "*");
 
   const data = await new Promise((resolve) => {
     window.addEventListener("message", (event) => {
       if (event.data?.source == "recording-data-response" &&
-          event.data?.version == RecordingDataVersion) {
+          event.data?.messageHandlerId == gLastMessageHandlerId) {
         const decoder = new TextDecoder();
         const jsonString = decoder.decode(event.data.buffer);
-        const data = JSON.parse(jsonString) as RerecordData;
+        const data = JSON.parse(jsonString) as SimulationData;
         resolve(data);
       }
     });
   });
 
-  console.log("RerecordData", JSON.stringify(data));
-
-  const rerecordRval = await sendCommandDedicatedClient({
-    method: "Recording.globalExperimentalCommand",
-    params: {
-      name: "rerecordGenerate",
-      params: {
-        rerecordData: data,
-        // FIXME the backend should not require an API key for this command.
-        // For now we use an API key used in Replay's devtools (which is public
-        // but probably shouldn't be).
-        apiKey: "rwk_b6mnJ00rI4pzlwkYmggmmmV1TVQXA0AUktRHoo4vGl9",
-        // FIXME the backend currently requires this but shouldn't.
-        recordingId: "dummy-recording-id",
-      },
-    },
-  });
-
-  console.log("RerecordRval", rerecordRval);
-
-  const recordingId = (rerecordRval as any).rval.rerecordedRecordingId as string;
-  console.log("CreatedRecording", recordingId);
-  return recordingId;
+  console.log("SimulationData", JSON.stringify(data));
+  return data as SimulationData;
 }
 
-export async function getMouseData(iframe: HTMLIFrameElement, position: { x: number; y: number }) {
+export interface MouseData {
+  selector: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+export async function getMouseData(iframe: HTMLIFrameElement, position: { x: number; y: number }): Promise<MouseData> {
   assert(iframe.contentWindow);
   iframe.contentWindow.postMessage({ source: "mouse-data-request", position }, "*");
 
   const mouseData = await new Promise((resolve) => {
     window.addEventListener("message", (event) => {
-      if (event.data?.source == "mouse-data-response") {
+      if (event.data?.source == "mouse-data-response" &&
+          event.data?.messageHandlerId == gLastMessageHandlerId) {
         resolve(event.data.mouseData);
       }
     });
   });
 
-  return mouseData;
+  return mouseData as MouseData;
 }
 
-function addRecordingMessageHandler() {
-  const resources: Map<string, RerecordResource> = new Map();
-  const interactions: RerecordInteraction[] = [];
+// Add handlers to the current iframe's window.
+function addRecordingMessageHandler(messageHandlerId: string) {
+  const resources: Map<string, SimulationResource> = new Map();
+  const interactions: SimulationInteraction[] = [];
   const indexedDBAccesses: IndexedDBAccess[] = [];
   const localStorageAccesses: LocalStorageAccess[] = [];
 
-  // Promises which will resolve when all resources have been added.
-  const promises: Promise<void>[] = [];
-
-  // Set of URLs which are currently being fetched.
-  const pendingFetches = new Set<string>();
-
   const startTime = Date.now();
-
-  function getScriptImports(text: string) {
-    // TODO: This should use a real parser.
-    const imports: string[] = [];
-    const lines = text.split("\n");
-    lines.forEach((line, index) => {
-      let match = line.match(/^import.*?['"]([^'")]+)/);
-      if (match) {
-        imports.push(match[1]);
-      }
-      match = line.match(/^export.*?from ['"]([^'")]+)/);
-      if (match) {
-        imports.push(match[1]);
-      }
-      if (line == "import {" || line == "export {") {
-        for (let i = index + 1; i < lines.length; i++) {
-          const match = lines[i].match(/} from ['"]([^'")]+)/);
-          if (match) {
-            imports.push(match[1]);
-            break;
-          }
-        }
-      }
-    });
-    return imports;
-  }
 
   function addTextResource(path: string, text: string) {
     const url = (new URL(path, window.location.href)).href;
@@ -186,114 +143,8 @@ function addRecordingMessageHandler() {
     });
   }
 
-  async function fetchAndAddResource(path: string) {
-    pendingFetches.add(path);
-    const response = await baseFetch(path);
-    pendingFetches.delete(path);
-
-    const text = await response.text();
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-
-    const url = (new URL(path, window.location.href)).href;
-    if (resources.has(url)) {
-      return;
-    }
-
-    resources.set(url, {
-      url,
-      requestBodyBase64: "",
-      responseBodyBase64: stringToBase64(text),
-      responseStatus: response.status,
-      responseHeaders,
-    });
-
-    const contentType = responseHeaders["content-type"];
-
-    // MIME types that can contain JS.
-    const JavaScriptMimeTypes = ["application/javascript", "text/javascript", "text/html"];
-
-    if (JavaScriptMimeTypes.includes(contentType)) {
-      const imports = getScriptImports(text);
-      for (const path of imports) {
-        promises.push(fetchAndAddResource(path));
-      }
-    }
-
-    if (contentType == "text/html") {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, "text/html");
-      const scripts = doc.querySelectorAll("script");
-      for (const script of scripts) {
-        promises.push(fetchAndAddResource(script.src));
-      }
-    }
-  }
-
-  async function getRerecordData(): Promise<RerecordData> {
-    // For now we only deal with cases where there is a single HTML page whose
-    // contents are expected to be filled in by the client code. We do this to
-    // avoid difficulties in exactly emulating the webcontainer's behavior when
-    // generating the recording.
-    let htmlContents = "<html><body>";
-
-    // Vite needs this to be set for the react plugin to work.
-    htmlContents += "<script>window.__vite_plugin_react_preamble_installed__ = true;</script>";
-
-    // Find all script elements and add them to the document.
-    const scriptElements = document.getElementsByTagName('script');
-    [...scriptElements].forEach((script, index) => {
-      let src = script.src;
-      if (src) {
-        promises.push(fetchAndAddResource(src));
-      } else {
-        assert(script.textContent, "Script element has no src and no text content");
-        const path = `script-${index}.js`;
-        addTextResource(path, script.textContent);
-      }
-      const { origin } = new URL(window.location.href);
-      if (src.startsWith(origin)) {
-        src = src.slice(origin.length);
-      }
-      htmlContents += `<script src="${src}" type="${script.type}"></script>`;
-    });
-
-    // Find all inline styles and add them to the document.
-    const cssElements = document.getElementsByTagName('style');
-    for (const style of cssElements) {
-      htmlContents += `<style>${style.textContent}</style>`;
-    }
-
-    // Find all stylesheet links and add them to the document.
-    const linkElements = document.getElementsByTagName('link');
-    for (const link of linkElements) {
-      if (link.rel === 'stylesheet' && link.href) {
-        promises.push(fetchAndAddResource(link.href));
-        htmlContents += `<link rel="stylesheet" href="${link.href}">`;
-      }
-    }
-
-    // React needs a root element to mount into.
-    htmlContents += "<div id='root'></div>";
-
-    htmlContents += "</body></html>";
-
-    addTextResource(window.location.href, htmlContents);
-
-    const interval = setInterval(() => {
-      console.log("PendingFetches", pendingFetches.size, pendingFetches);
-    }, 1000);
-
-    while (true) {
-      const length = promises.length;
-      await Promise.all(promises);
-      if (promises.length == length) {
-        break;
-      }
-    }
-
-    clearInterval(interval);
-
-    const data: RerecordData = {
+  async function getSimulationData(): Promise<SimulationData> {
+    return {
       locationHref: window.location.href,
       documentUrl: window.location.href,
       resources: Array.from(resources.values()),
@@ -301,20 +152,18 @@ function addRecordingMessageHandler() {
       indexedDBAccesses,
       localStorageAccesses,
     };
-
-    return data;
   }
 
   window.addEventListener("message", async (event) => {
     switch (event.data?.source) {
       case "recording-data-request": {
-        const data = await getRerecordData();
+        const data = await getSimulationData();
 
         const encoder = new TextEncoder();
         const serializedData = encoder.encode(JSON.stringify(data));
         const buffer = serializedData.buffer;
 
-        window.parent.postMessage({ source: "recording-data-response", buffer, version: RecordingDataVersion }, "*", [buffer]);
+        window.parent.postMessage({ source: "recording-data-response", buffer, messageHandlerId }, "*", [buffer]);
         break;
       }
       case "mouse-data-request": {
@@ -324,14 +173,14 @@ function addRecordingMessageHandler() {
 
         const selector = computeSelector(element);
         const rect = element.getBoundingClientRect();
-        const mouseData = {
+        const mouseData: MouseData = {
           selector,
           width: rect.width,
           height: rect.height,
           x: x - rect.x,
           y: y - rect.y,
         };
-        window.parent.postMessage({ source: "mouse-data-response", mouseData }, "*");
+        window.parent.postMessage({ source: "mouse-data-response", mouseData, messageHandlerId }, "*");
         break;
       }
     }
@@ -397,7 +246,7 @@ function addRecordingMessageHandler() {
   window.addEventListener("click", (event) => {
     if (event.target) {
       interactions.push({
-        kind: RerecordInteractionKind.Click,
+        kind: SimulationInteractionKind.Click,
         time: Date.now() - startTime,
         ...getMouseEventData(event)
       });
@@ -407,7 +256,7 @@ function addRecordingMessageHandler() {
   window.addEventListener("dblclick", (event) => {
     if (event.target) {
       interactions.push({
-        kind: RerecordInteractionKind.DblClick,
+        kind: SimulationInteractionKind.DblClick,
         time: Date.now() - startTime,
         ...getMouseEventData(event)
       });
@@ -417,7 +266,7 @@ function addRecordingMessageHandler() {
   window.addEventListener("keydown", (event) => {
     if (event.key) {
       interactions.push({
-        kind: RerecordInteractionKind.KeyDown,
+        kind: SimulationInteractionKind.KeyDown,
         time: Date.now() - startTime,
         ...getKeyboardEventData(event)
       });
@@ -633,20 +482,40 @@ function addRecordingMessageHandler() {
   };
 }
 
+const RecordingMessageHandlerScriptPrefix = `
+    <script>
+      ${assert}
+      ${stringToBase64}
+      ${uint8ArrayToBase64}
+      (${addRecordingMessageHandler})
+`;
+
 export function injectRecordingMessageHandler(content: string) {
   const headTag = content.indexOf("<head>");
   assert(headTag != -1, "No <head> tag found");
 
   const headEnd = headTag + 6;
 
-  const text = `
-    <script>
-      ${assert}
-      ${stringToBase64}
-      ${uint8ArrayToBase64}
-      (${addRecordingMessageHandler.toString().replace("RecordingDataVersion", `${RecordingDataVersion}`)})()
-    </script>
-  `;
+  gLastMessageHandlerId = Math.random().toString(36).substring(2, 15);
+
+  const text = `${RecordingMessageHandlerScriptPrefix}("${gLastMessageHandlerId}")</script>`;
 
   return content.slice(0, headEnd) + text + content.slice(headEnd);
+}
+
+export function removeRecordingMessageHandler(content: string) {
+  const index = content.indexOf(RecordingMessageHandlerScriptPrefix);
+  if (index == -1) {
+    return content;
+  }
+  const prefix = content.substring(0, index);
+
+  const suffixStart = index + RecordingMessageHandlerScriptPrefix.length;
+
+  const closeScriptTag = "</script>";
+  const closeScriptIndex = content.indexOf(closeScriptTag, suffixStart);
+  assert(closeScriptIndex != -1, "No </script> tag found");
+  const suffix = content.substring(closeScriptIndex + closeScriptTag.length);
+
+  return prefix + suffix;
 }

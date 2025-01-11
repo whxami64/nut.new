@@ -17,6 +17,8 @@ import { extractRelativePath } from '~/utils/diff';
 import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
+import { removeRecordingMessageHandler } from '~/lib/replay/Recording';
+import { uint8ArrayToBase64 } from '../replay/ReplayProtocolClient';
 
 export interface ArtifactState {
   id: string;
@@ -343,7 +345,7 @@ export class WorkbenchStore {
     return artifacts[id];
   }
 
-  async generateZip() {
+  private async generateZip() {
     const zip = new JSZip();
     const files = this.files.get();
 
@@ -357,6 +359,7 @@ export class WorkbenchStore {
     for (const [filePath, dirent] of Object.entries(files)) {
       if (dirent?.type === 'file' && !dirent.isBinary) {
         const relativePath = extractRelativePath(filePath);
+        const content = removeRecordingMessageHandler(dirent.content);
 
         // split the path into segments
         const pathSegments = relativePath.split('/');
@@ -368,10 +371,10 @@ export class WorkbenchStore {
           for (let i = 0; i < pathSegments.length - 1; i++) {
             currentFolder = currentFolder.folder(pathSegments[i])!;
           }
-          currentFolder.file(pathSegments[pathSegments.length - 1], dirent.content);
+          currentFolder.file(pathSegments[pathSegments.length - 1], content);
         } else {
           // if there's only one segment, it's a file in the root
-          zip.file(relativePath, dirent.content);
+          zip.file(relativePath, content);
         }
       }
     }
@@ -384,6 +387,13 @@ export class WorkbenchStore {
   async downloadZip() {
     const { content, uniqueProjectName } = await this.generateZip();
     saveAs(content, `${uniqueProjectName}.zip`);
+  }
+
+  async generateZipBase64() {
+    const { content, uniqueProjectName } = await this.generateZip();
+    const buf = await content.arrayBuffer();
+    const contentBase64 = uint8ArrayToBase64(new Uint8Array(buf));
+    return { contentBase64, uniqueProjectName };
   }
 
   async syncFiles(targetHandle: FileSystemDirectoryHandle) {

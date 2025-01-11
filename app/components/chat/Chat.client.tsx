@@ -23,7 +23,11 @@ import type { ProviderInfo } from '~/types/model';
 import { useSearchParams } from '@remix-run/react';
 import { createSampler } from '~/utils/sampler';
 import { saveProjectPrompt } from './Messages.client';
-import { uint8ArrayToBase64 } from '../workbench/ReplayProtocolClient';
+import { uint8ArrayToBase64 } from '~/lib/replay/ReplayProtocolClient';
+import type { SimulationPromptClientData } from '~/lib/replay/SimulationPrompt';
+import { getIFrameSimulationData } from '~/lib/replay/Recording';
+import { getCurrentIFrame } from '../workbench/Preview';
+import { getCurrentMouseData } from '../workbench/PointSelector';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -241,7 +245,7 @@ export const ChatImpl = memo(
       setChatStarted(true);
     };
 
-    const sendMessage = async (_event: React.UIEvent, messageInput?: string) => {
+    const sendMessage = async (_event: React.UIEvent, messageInput?: string, simulation?: boolean) => {
       const _input = messageInput || input;
 
       if (_input.length === 0 || isLoading) {
@@ -257,6 +261,20 @@ export const ChatImpl = memo(
        */
       await workbenchStore.saveAllFiles();
 
+      const { contentBase64, uniqueProjectName } = await workbenchStore.generateZipBase64();
+
+      let simulationClientData: SimulationPromptClientData | undefined;
+      if (simulation) {
+        const simulationData = await getIFrameSimulationData(getCurrentIFrame());
+        const mouseData = getCurrentMouseData();
+
+        simulationClientData = {
+          simulationData: simulationData,
+          repositoryContents: contentBase64,
+          mouseData: mouseData,
+        };
+      }
+  
       const fileModifications = workbenchStore.getFileModifcations();
 
       chatStore.setKey('aborted', false);
@@ -303,7 +321,7 @@ export const ChatImpl = memo(
               image: imageData,
             })),
           ] as any, // Type assertion to bypass compiler check
-        });
+        }, { body: { simulationClientData } });
       }
 
       setInput('');
@@ -320,9 +338,6 @@ export const ChatImpl = memo(
       // The project contents are associated with the last message present when
       // the user message is added.
       const lastMessage = messages[messages.length - 1];
-      const { content, uniqueProjectName } = await workbenchStore.generateZip();
-      const buf = await content.arrayBuffer();
-      const contentBase64 = uint8ArrayToBase64(new Uint8Array(buf));
       saveProjectPrompt(lastMessage.id, { content: contentBase64, uniqueProjectName, input: _input });
     };
 
