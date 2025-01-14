@@ -142,16 +142,15 @@ function extractPropertiesFromMessage(message: Message): { model: string; provid
   return { model, provider, content: cleanedContent };
 }
 
-export async function streamText(props: {
+export async function getStreamTextArguments(props: {
   messages: Messages;
   env: Env;
-  options?: StreamingOptions;
   apiKeys?: Record<string, string>;
   files?: FileMap;
   providerSettings?: Record<string, IProviderSetting>;
   promptId?: string;
 }) {
-  const { messages, env: serverEnv, options, apiKeys, files, providerSettings, promptId } = props;
+  const { messages, env: serverEnv, apiKeys, files, providerSettings, promptId } = props;
 
   // console.log({serverEnv});
 
@@ -202,9 +201,7 @@ export async function streamText(props: {
 
   const coreMessages = convertToCoreMessages(processedMessages as any);
 
-  console.log("QueryModel", JSON.stringify({ systemPrompt, coreMessages }));
-
-  return _streamText({
+  return {
     model: provider.getModelInstance({
       model: currentModel,
       serverEnv,
@@ -214,6 +211,18 @@ export async function streamText(props: {
     system: systemPrompt,
     maxTokens: dynamicMaxTokens,
     messages: coreMessages,
-    ...options,
-  });
+  };
+}
+
+export async function streamText(props: {
+  messages: Messages;
+  env: Env;
+  options?: StreamingOptions;
+  apiKeys?: Record<string, string>;
+  files?: FileMap;
+  providerSettings?: Record<string, IProviderSetting>;
+  promptId?: string;
+}) {
+  const args = await getStreamTextArguments(props);
+  return _streamText({ ...args, ...props.options });
 }
