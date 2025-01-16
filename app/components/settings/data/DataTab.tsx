@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from '@remix-run/react';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
-import { db, deleteById, getAll } from '~/lib/persistence';
+import { db, deleteById, getAll, setMessages } from '~/lib/persistence';
 import { logStore } from '~/lib/stores/logs';
 import { classNames } from '~/utils/classNames';
-import styles from '~/components/settings/Settings.module.scss';
+import type { Message } from 'ai';
 
 // List of supported providers that can have API keys
 const API_KEY_PROVIDERS = [
@@ -23,9 +23,8 @@ const API_KEY_PROVIDERS = [
   'Perplexity',
   'Cohere',
   'AzureOpenAI',
+  'AmazonBedrock',
 ] as const;
-
-type Provider = typeof API_KEY_PROVIDERS[number];
 
 interface ApiKeys {
   [key: string]: string;
@@ -52,6 +51,7 @@ export default function DataTab() {
       const error = new Error('Database is not available');
       logStore.logError('Failed to export chats - DB unavailable', error);
       toast.error('Database is not available');
+
       return;
     }
 
@@ -83,11 +83,13 @@ export default function DataTab() {
       const error = new Error('Database is not available');
       logStore.logError('Failed to delete chats - DB unavailable', error);
       toast.error('Database is not available');
+
       return;
     }
 
     try {
       setIsDeleting(true);
+
       const allChats = await getAll(db);
       await Promise.all(allChats.map((chat) => deleteById(db!, chat.id)));
       logStore.logSystem('All chats deleted successfully', { count: allChats.length });
@@ -125,16 +127,22 @@ export default function DataTab() {
 
   const handleImportSettings = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+
+    if (!file) {
+      return;
+    }
 
     const reader = new FileReader();
+
     reader.onload = (e) => {
       try {
         const settings = JSON.parse(e.target?.result as string);
-        
+
         Object.entries(settings).forEach(([key, value]) => {
           if (key === 'bolt_theme') {
-            if (value) localStorage.setItem(key, value as string);
+            if (value) {
+              localStorage.setItem(key, value as string);
+            }
           } else if (value) {
             Cookies.set(key, value as string);
           }
@@ -152,14 +160,14 @@ export default function DataTab() {
 
   const handleExportApiKeyTemplate = () => {
     const template: ApiKeys = {};
-    API_KEY_PROVIDERS.forEach(provider => {
+    API_KEY_PROVIDERS.forEach((provider) => {
       template[`${provider}_API_KEY`] = '';
     });
 
-    template['OPENAI_LIKE_API_BASE_URL'] = '';
-    template['LMSTUDIO_API_BASE_URL'] = '';
-    template['OLLAMA_API_BASE_URL'] = '';
-    template['TOGETHER_API_BASE_URL'] = '';
+    template.OPENAI_LIKE_API_BASE_URL = '';
+    template.LMSTUDIO_API_BASE_URL = '';
+    template.OLLAMA_API_BASE_URL = '';
+    template.TOGETHER_API_BASE_URL = '';
 
     downloadAsJson(template, 'api-keys-template.json');
     toast.success('API keys template exported successfully');
@@ -167,17 +175,22 @@ export default function DataTab() {
 
   const handleImportApiKeys = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+
+    if (!file) {
+      return;
+    }
 
     const reader = new FileReader();
+
     reader.onload = (e) => {
       try {
         const apiKeys = JSON.parse(e.target?.result as string);
         let importedCount = 0;
         const consolidatedKeys: Record<string, string> = {};
 
-        API_KEY_PROVIDERS.forEach(provider => {
+        API_KEY_PROVIDERS.forEach((provider) => {
           const keyName = `${provider}_API_KEY`;
+
           if (apiKeys[keyName]) {
             consolidatedKeys[provider] = apiKeys[keyName];
             importedCount++;
@@ -187,13 +200,14 @@ export default function DataTab() {
         if (importedCount > 0) {
           // Store all API keys in a single cookie as JSON
           Cookies.set('apiKeys', JSON.stringify(consolidatedKeys));
-          
+
           // Also set individual cookies for backward compatibility
           Object.entries(consolidatedKeys).forEach(([provider, key]) => {
             Cookies.set(`${provider}_API_KEY`, key);
           });
 
           toast.success(`Successfully imported ${importedCount} API keys/URLs. Refreshing page to apply changes...`);
+
           // Reload the page after a short delay to allow the toast to be seen
           setTimeout(() => {
             window.location.reload();
@@ -203,12 +217,13 @@ export default function DataTab() {
         }
 
         // Set base URLs if they exist
-        ['OPENAI_LIKE_API_BASE_URL', 'LMSTUDIO_API_BASE_URL', 'OLLAMA_API_BASE_URL', 'TOGETHER_API_BASE_URL'].forEach(baseUrl => {
-          if (apiKeys[baseUrl]) {
-            Cookies.set(baseUrl, apiKeys[baseUrl]);
-          }
-        });
-
+        ['OPENAI_LIKE_API_BASE_URL', 'LMSTUDIO_API_BASE_URL', 'OLLAMA_API_BASE_URL', 'TOGETHER_API_BASE_URL'].forEach(
+          (baseUrl) => {
+            if (apiKeys[baseUrl]) {
+              Cookies.set(baseUrl, apiKeys[baseUrl]);
+            }
+          },
+        );
       } catch (error) {
         toast.error('Failed to import API keys. Make sure the file is a valid JSON file.');
         console.error('Failed to import API keys:', error);
@@ -216,6 +231,81 @@ export default function DataTab() {
     };
     reader.readAsText(file);
     event.target.value = '';
+  };
+
+  const processChatData = (
+    data: any,
+  ): Array<{
+    id: string;
+    messages: Message[];
+    description: string;
+    urlId?: string;
+  }> => {
+    // Handle Bolt standard format (single chat)
+    if (data.messages && Array.isArray(data.messages)) {
+      const chatId = crypto.randomUUID();
+      return [
+        {
+          id: chatId,
+          messages: data.messages,
+          description: data.description || 'Imported Chat',
+          urlId: chatId,
+        },
+      ];
+    }
+
+    // Handle Bolt export format (multiple chats)
+    if (data.chats && Array.isArray(data.chats)) {
+      return data.chats.map((chat: { id?: string; messages: Message[]; description?: string; urlId?: string }) => ({
+        id: chat.id || crypto.randomUUID(),
+        messages: chat.messages,
+        description: chat.description || 'Imported Chat',
+        urlId: chat.urlId,
+      }));
+    }
+
+    console.error('No matching format found for:', data);
+    throw new Error('Unsupported chat format');
+  };
+
+  const handleImportChats = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+
+      if (!file || !db) {
+        toast.error('Something went wrong');
+        return;
+      }
+
+      try {
+        const content = await file.text();
+        const data = JSON.parse(content);
+        const chatsToImport = processChatData(data);
+
+        for (const chat of chatsToImport) {
+          await setMessages(db, chat.id, chat.messages, chat.urlId, chat.description);
+        }
+
+        logStore.logSystem('Chats imported successfully', { count: chatsToImport.length });
+        toast.success(`Successfully imported ${chatsToImport.length} chat${chatsToImport.length > 1 ? 's' : ''}`);
+        window.location.reload();
+      } catch (error) {
+        if (error instanceof Error) {
+          logStore.logError('Failed to import chats:', error);
+          toast.error('Failed to import chats: ' + error.message);
+        } else {
+          toast.error('Failed to import chats');
+        }
+
+        console.error(error);
+      }
+    };
+
+    input.click();
   };
 
   return (
@@ -226,9 +316,7 @@ export default function DataTab() {
           <div className="flex flex-col gap-4">
             <div>
               <h4 className="text-bolt-elements-textPrimary mb-2">Chat History</h4>
-              <p className="text-sm text-bolt-elements-textSecondary mb-4">
-                Export or delete all your chat history.
-              </p>
+              <p className="text-sm text-bolt-elements-textSecondary mb-4">Export or delete all your chat history.</p>
               <div className="flex gap-4">
                 <button
                   onClick={handleExportAllChats}
@@ -237,11 +325,17 @@ export default function DataTab() {
                   Export All Chats
                 </button>
                 <button
+                  onClick={handleImportChats}
+                  className="px-4 py-2 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-textPrimary rounded-lg transition-colors"
+                >
+                  Import Chats
+                </button>
+                <button
                   onClick={handleDeleteAllChats}
                   disabled={isDeleting}
                   className={classNames(
                     'px-4 py-2 bg-bolt-elements-button-danger-background hover:bg-bolt-elements-button-danger-backgroundHover text-bolt-elements-button-danger-text rounded-lg transition-colors',
-                    isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                    isDeleting ? 'opacity-50 cursor-not-allowed' : '',
                   )}
                 >
                   {isDeleting ? 'Deleting...' : 'Delete All Chats'}
@@ -263,12 +357,7 @@ export default function DataTab() {
                 </button>
                 <label className="px-4 py-2 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-textPrimary rounded-lg transition-colors cursor-pointer">
                   Import Settings
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportSettings}
-                    className="hidden"
-                  />
+                  <input type="file" accept=".json" onChange={handleImportSettings} className="hidden" />
                 </label>
               </div>
             </div>
@@ -287,12 +376,7 @@ export default function DataTab() {
                 </button>
                 <label className="px-4 py-2 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-textPrimary rounded-lg transition-colors cursor-pointer">
                   Import API Keys
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportApiKeys}
-                    className="hidden"
-                  />
+                  <input type="file" accept=".json" onChange={handleImportApiKeys} className="hidden" />
                 </label>
               </div>
             </div>
@@ -301,4 +385,4 @@ export default function DataTab() {
       </div>
     </div>
   );
-} 
+}
