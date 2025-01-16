@@ -183,8 +183,6 @@ export async function getStreamTextArguments(props: {
 
   const dynamicMaxTokens = modelDetails && modelDetails.maxTokenAllowed ? modelDetails.maxTokenAllowed : MAX_TOKENS;
 
-  const provider = PROVIDER_LIST.find((p) => p.name === currentProvider) || DEFAULT_PROVIDER;
-
   let systemPrompt =
     PromptLibrary.getPropmtFromLibrary(promptId || 'default', {
       cwd: WORK_DIR,
@@ -202,12 +200,8 @@ export async function getStreamTextArguments(props: {
   const coreMessages = convertToCoreMessages(processedMessages as any);
 
   return {
-    model: provider.getModelInstance({
-      model: currentModel,
-      serverEnv,
-      apiKeys,
-      providerSettings,
-    }),
+    currentModel,
+    currentProvider,
     system: systemPrompt,
     maxTokens: dynamicMaxTokens,
     messages: coreMessages,
@@ -224,5 +218,16 @@ export async function streamText(props: {
   promptId?: string;
 }) {
   const args = await getStreamTextArguments(props);
-  return _streamText({ ...args, ...props.options });
+  const { currentModel, currentProvider } = args;
+
+  const provider = PROVIDER_LIST.find((p) => p.name === currentProvider) || DEFAULT_PROVIDER;
+
+  const model = provider.getModelInstance({
+    model: currentModel,
+    serverEnv: props.env,
+    apiKeys: props.apiKeys,
+    providerSettings: props.providerSettings,
+  });
+
+  return _streamText({ ...args, ...props.options, model });
 }
