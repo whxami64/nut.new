@@ -14,6 +14,7 @@ import {
   duplicateChat,
   createChatFromMessages,
 } from './db';
+import { loadProblem } from '~/components/chat/LoadProblemButton';
 
 export interface ChatHistoryItem {
   id: string;
@@ -32,12 +33,30 @@ export const description = atom<string | undefined>(undefined);
 
 export function useChatHistory() {
   const navigate = useNavigate();
-  const { id: mixedId } = useLoaderData<{ id?: string }>();
+  const { id: mixedId, problemId } = useLoaderData<{ id?: string, problemId?: string }>() ?? {};
   const [searchParams] = useSearchParams();
 
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [ready, setReady] = useState<boolean>(false);
   const [urlId, setUrlId] = useState<string | undefined>();
+
+  const importChat = async (description: string, messages: Message[]) => {
+    if (!db) {
+      return;
+    }
+
+    try {
+      const newId = await createChatFromMessages(db, description, messages);
+      window.location.href = `/chat/${newId}`;
+      toast.success('Chat imported successfully');
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error('Failed to import chat: ' + error.message);
+      } else {
+        toast.error('Failed to import chat');
+      }
+    }
+  };
 
   useEffect(() => {
     if (!db) {
@@ -75,11 +94,13 @@ export function useChatHistory() {
           logStore.logError('Failed to load chat messages', error);
           toast.error(error.message);
         });
+    } else if (problemId) {
+      loadProblem(problemId, importChat).then(() => setReady(true));
     }
   }, []);
 
   return {
-    ready: !mixedId || ready,
+    ready: ready || (!mixedId && !problemId),
     initialMessages,
     storeMessageHistory: async (messages: Message[]) => {
       if (!db || messages.length === 0) {
@@ -125,23 +146,7 @@ export function useChatHistory() {
         console.log(error);
       }
     },
-    importChat: async (description: string, messages: Message[]) => {
-      if (!db) {
-        return;
-      }
-
-      try {
-        const newId = await createChatFromMessages(db, description, messages);
-        window.location.href = `/chat/${newId}`;
-        toast.success('Chat imported successfully');
-      } catch (error) {
-        if (error instanceof Error) {
-          toast.error('Failed to import chat: ' + error.message);
-        } else {
-          toast.error('Failed to import chat');
-        }
-      }
-    },
+    importChat,
     exportChat: async (id = urlId) => {
       if (!db || !id) {
         return;
