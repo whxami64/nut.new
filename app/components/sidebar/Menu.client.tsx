@@ -128,7 +128,7 @@ export const Menu = () => {
       variants={menuVariants}
       className="flex selection-accent flex-col side-menu fixed top-0 w-[350px] h-full bg-bolt-elements-background-depth-2 border-r rounded-r-3xl border-bolt-elements-borderColor z-sidebar shadow-xl shadow-bolt-elements-sidebar-dropdownShadow text-sm"
     >
-      <div className="h-[45px]" /> {/* Spacer for top margin */}
+      <div className="h-[55px]" /> {/* Spacer for top margin */}
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
         <div className="flex gap-2 px-2 mb-0 ml-2.5">
           <a
@@ -224,7 +224,6 @@ export const Menu = () => {
         </div>
       </div>
       <SettingsWindow open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      <SaveProblem />
     </motion.div>
   );
 };
