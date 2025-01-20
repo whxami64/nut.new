@@ -33,7 +33,7 @@ function AboutPage() {
             >
               Bolt.new
             </a>{' '}
-            for helping you develop your apps using AI. AI developers frequently struggle with fixing
+            for helping you develop full stack apps using AI. AI developers frequently struggle with fixing
             even simple bugs when they don't know the cause, and get stuck making ineffective changes
             over and over. We want to crack these tough nuts, so to speak, so you can get back to building.
           </p>
@@ -49,14 +49,43 @@ function AboutPage() {
               Replay.io
             </a>{' '}
             recording of your app and whatever you did to produce the bug. The recording captures all the runtime
-            behavior of your app, which is analyzed to explain the root cause of the bug.
-            This explanation is given to the AI developer to help it write a good fix.
+            behavior of your app, which is analyzed to explain the bug's root cause.
+            This explanation is given to the AI developer so it has context to write a good fix.
+          </p>
+
+          <p className="mb-6">
+            These are early days for Nut and it doesn't do much yet. To help with development
+            we're building a public collection of problems that AIs get stuck on, which you can browse or submit
+            new problems to using the sidebar menu.
           </p>
 
           <p>
-            These are early days for Nut and it's not going to help with much yet. To help with Nut's development
-            we're building a public collection of problems that AIs get stuck on, which you can browse or submit
-            new problems to using the sidebar menu.
+            Nut is being developed by the{' '}
+            <a
+              href="https://replay.io"
+              className="text-bolt-elements-accent underline hover:no-underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Replay.io
+            </a>{' '}
+            team. We'd love to hear from you! Reach us at{' '}
+            <a
+              href="mailto:hi@replay.io"
+              className="text-bolt-elements-accent underline hover:no-underline"
+            >
+              hi@replay.io
+            </a>{' '}
+            or fill out our{' '}
+            <a
+              href="https://replay.io/contact"
+              className="text-bolt-elements-accent underline hover:no-underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              contact form
+            </a>{' '}
+            and we'll be in touch.
           </p>
         </div>
       </div>
