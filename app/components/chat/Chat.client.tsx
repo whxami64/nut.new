@@ -272,7 +272,7 @@ export const ChatImpl = memo(
       let enhancedPrompt, message;
       try {
         enhancedPrompt = await getSimulationEnhancedPrompt(recordingId, repositoryContents);
-        message = `Explanation of the bug: ${enhancedPrompt}`;
+        message = `Explanation of the bug:\n\n${enhancedPrompt}`;
       } catch (e) {
         console.error("Error enhancing prompt", e);
         message = "Error enhancing prompt.";
