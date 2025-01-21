@@ -54,7 +54,7 @@ function AboutPage() {
           </p>
 
           <p className="mb-6">
-            These are early days for Nut and it doesn't do much yet. To help with development
+            These are early days for Nut and it isn't very capable yet. To help with development
             we're building a public collection of problems that AIs get stuck on, which you can browse or submit
             new problems to using the sidebar menu.
           </p>
