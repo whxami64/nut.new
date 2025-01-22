@@ -27,6 +27,7 @@ import { getIFrameSimulationData, type SimulationData } from '~/lib/replay/Recor
 import { getCurrentIFrame } from '../workbench/Preview';
 import { getCurrentMouseData } from '../workbench/PointSelector';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
+import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -295,6 +296,17 @@ export const ChatImpl = memo(
         return;
       }
 
+      const anthropicApiKey = Cookies.get(anthropicApiKeyCookieName);
+      if (!anthropicApiKey) {
+        const numFreeUses = +(Cookies.get(anthropicNumFreeUsesCookieName) || 0);
+        if (numFreeUses >= MaxFreeUses) {
+          toast.error('All free uses consumed. Please set an Anthropic API key in the settings.');
+          return;
+        }
+
+        Cookies.set(anthropicNumFreeUsesCookieName, (numFreeUses + 1).toString());
+      }
+
       setSimulationLoading(true);
 
       /**
@@ -355,7 +367,7 @@ export const ChatImpl = memo(
             image: imageData,
           })),
         ] as any, // Type assertion to bypass compiler check
-      }, { body: { simulationEnhancedPrompt } });
+      }, { body: { simulationEnhancedPrompt, anthropicApiKey } });
 
       if (fileModifications !== undefined) {
         /**

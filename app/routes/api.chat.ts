@@ -15,11 +15,12 @@ Focus specifically on fixing this bug. Do not guess about other problems.
 `;
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
-  const { messages, files, promptId, simulationEnhancedPrompt } = await request.json<{
+  const { messages, files, promptId, simulationEnhancedPrompt, anthropicApiKey: clientAnthropicApiKey } = await request.json<{
     messages: Messages;
     files: any;
     promptId?: string;
     simulationEnhancedPrompt?: string;
+    anthropicApiKey?: string;
   }>();
 
   let finished: (v?: any) => void;
@@ -37,7 +38,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
       promptId,
     });
 
-    const anthropicApiKey = context.cloudflare.env.ANTHROPIC_API_KEY;
+    const anthropicApiKey = clientAnthropicApiKey ?? context.cloudflare.env.ANTHROPIC_API_KEY;
     if (!anthropicApiKey) {
       throw new Error("Anthropic API key is not set");
     }
