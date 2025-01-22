@@ -59,7 +59,7 @@ async function fetchProblems(): Promise<BoltProblemDescription[]> {
       },
     });
     console.log("ListProblemsRval", rv);
-    return (rv as any).rval.problems;
+    return (rv as any).rval.problems.reverse();
   } catch (error) {
     console.error("Error fetching problems", error);
     toast.error("Failed to fetch problems");
