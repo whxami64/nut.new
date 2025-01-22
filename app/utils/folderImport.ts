@@ -1,5 +1,5 @@
 import type { Message } from 'ai';
-import { generateId } from './fileUtils';
+import { generateId, shouldIncludeFile } from './fileUtils';
 import { detectProjectCommands, createCommandsMessage } from './projectCommands';
 
 export interface FileArtifact {
@@ -41,19 +41,18 @@ export const createChatFromFolder = async (
       ? `\n\nSkipped ${binaryFiles.length} binary files:\n${binaryFiles.map((f) => `- ${f}`).join('\n')}`
       : '';
 
+  let filesContent = `I've imported the contents of the "${folderName}" folder.${binaryFilesMessage}`;
+  filesContent += `<boltArtifact id="imported-files" title="Imported Files">`;
+  for (const file of fileArtifacts) {
+    if (shouldIncludeFile(file.path)) {
+      filesContent += `<boltAction type="file" filePath="${file.path}">${file.content}</boltAction>\n\n`;
+    }
+  }
+  filesContent += `</boltArtifact>`;
+
   const filesMessage: Message = {
     role: 'assistant',
-    content: `I've imported the contents of the "${folderName}" folder.${binaryFilesMessage}
-
-<boltArtifact id="imported-files" title="Imported Files">
-${fileArtifacts
-  .map(
-    (file) => `<boltAction type="file" filePath="${file.path}">
-${file.content}
-</boltAction>`,
-  )
-  .join('\n\n')}
-</boltArtifact>`,
+    content: filesContent,
     id: generateId(),
     createdAt: new Date(),
   };

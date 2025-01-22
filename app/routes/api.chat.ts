@@ -60,7 +60,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
           await chatAnthropic(chatController, anthropicApiKey, system, coreMessages);
         } catch (e) {
           console.error(e);
-          chatController.writeText("Error chatting with Anthropic.");
+          chatController.writeText(`Error chatting with Anthropic: ${e}`);
         }
 
         controller.close();

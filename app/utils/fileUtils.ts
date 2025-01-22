@@ -16,6 +16,7 @@ export const IGNORE_PATTERNS = [
   '**/npm-debug.log*',
   '**/yarn-debug.log*',
   '**/yarn-error.log*',
+  '**/package-lock.json',
 ];
 
 export const MAX_FILES = 1000;
@@ -39,6 +40,10 @@ export const isBinaryFile = async (file: File): Promise<boolean> => {
 };
 
 export const shouldIncludeFile = (path: string): boolean => {
+  const projectDirectory = "/home/project/";
+  if (path.startsWith(projectDirectory)) {
+    path = path.substring(projectDirectory.length);
+  }
   return !ig.ignores(path);
 };
 

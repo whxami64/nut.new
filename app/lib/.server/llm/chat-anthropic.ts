@@ -38,6 +38,8 @@ export async function chatAnthropic(chatController: ChatStreamController, apiKey
     });
   }
 
+  console.log("AnthropicMessages", JSON.stringify(messageParams, null, 2));
+
   const response = await anthropic.messages.create({
     model: "claude-3-5-sonnet-20241022",
     messages: messageParams,

@@ -28,6 +28,8 @@ import { getCurrentIFrame } from '../workbench/Preview';
 import { getCurrentMouseData } from '../workbench/PointSelector';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
+import type { FileMap } from '~/lib/stores/files';
+import { shouldIncludeFile } from '~/utils/fileUtils';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -130,6 +132,16 @@ function handleInjectMessages(baseMessages: Message[], injectedMessages: Injecte
   return messages;
 }
 
+function filterFiles(files: FileMap): FileMap {
+  const rv: FileMap = {};
+  for (const [path, file] of Object.entries(files)) {
+    if (shouldIncludeFile(path)) {
+      rv[path] = file;
+    }
+  }
+  return rv;
+}
+
 export const ChatImpl = memo(
   ({ description, initialMessages, storeMessageHistory, importChat, exportChat }: ChatProps) => {
     useShortcuts();
@@ -151,7 +163,7 @@ export const ChatImpl = memo(
     const { messages: baseMessages, isLoading, input, handleInputChange, setInput, stop, append } = useChat({
       api: '/api/chat',
       body: {
-        files,
+        files: filterFiles(files),
         promptId,
       },
       sendExtraMessageFields: true,
