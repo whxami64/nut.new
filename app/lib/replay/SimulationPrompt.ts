@@ -78,27 +78,37 @@ interface ExecutionDataPoint {
 
 // Initial point for analysis that is an uncaught exception thrown
 // from application code called by React, causing the app to unmount.
-interface ExecutionDataInitialPointReactException {
+interface RecordingFailureDataReactException {
   kind: "ReactException";
   errorText: string;
+  point: ProtocolExecutionPoint;
 
   // Whether the exception was thrown by library code called at the point.
   calleeFrame: boolean;
 }
 
 // Initial point for analysis that is an exception logged to the console.
-interface ExecutionDataInitialPointConsoleError {
+interface RecordingFailureDataConsoleError {
   kind: "ConsoleError";
   errorText: string;
+  point: ProtocolExecutionPoint;
 }
 
-type BaseExecutionDataInitialPoint =
-  | ExecutionDataInitialPointReactException
-  | ExecutionDataInitialPointConsoleError;
+// Fallback failure data shows the React component tree at the end of the recording.
+interface ReactComponentTree {
+  name: string;
+  children: ReactComponentTree[];
+}
 
-export type ExecutionDataInitialPoint = {
-  point: ProtocolExecutionPoint;
-} & BaseExecutionDataInitialPoint;
+interface RecordingFailureDataComponentTree {
+  kind: "ComponentTree";
+  componentTree: ReactComponentTree;
+}
+
+export type RecordingFailureData =
+  | RecordingFailureDataReactException
+  | RecordingFailureDataConsoleError
+  | RecordingFailureDataComponentTree;
 
 export interface ExecutionDataAnalysisResult {
   // Points which were described.
@@ -119,7 +129,7 @@ export interface ExecutionDataAnalysisResult {
 
   // If no point or comment was available, describes the failure associated with the
   // initial point of the analysis.
-  failureData?: ExecutionDataInitialPoint;
+  failureData?: RecordingFailureData;
 }
 
 function trimFileName(url: string): string {
@@ -164,13 +174,25 @@ async function annotateSource(repositoryContents: string, fileName: string, sour
   return rv;
 }
 
+function describeComponentTree(componentTree: ReactComponentTree, indent: string): string {
+  let rv = "";
+  rv += `${indent}${componentTree.name}\n`;
+  for (const child of componentTree.children) {
+    rv += describeComponentTree(child, indent + "  ");
+  }
+  return rv;
+}
+
+function codeBlock(text: string): string {
+  return "```\n" + text + (text.endsWith("\n") ? "" : "\n") + "```";
+}
+
 async function enhancePromptFromFailureData(
-  failurePoint: ExecutionDataPoint,
-  failureData: ExecutionDataInitialPoint,
+  points: ExecutionDataPoint[],
+  failureData: RecordingFailureData,
   repositoryContents: string
 ): Promise<string> {
-  const pointText = failurePoint.location.source.trim();
-  const fileName = trimFileName(failurePoint.location.url);
+  const failurePoint = "point" in failureData ? points.find(p => p.point === failureData.point) : undefined;
 
   let prompt = "";
   let annotation;
@@ -188,14 +210,23 @@ async function enhancePromptFromFailureData(
       prompt += "An exception was thrown and later logged to the console.\n";
       annotation = `This line is throwing the exception "${failureData.errorText}"`;
       break;
+    case "ComponentTree":
+      prompt += "The React component tree at the end of the recording:\n\n";
+      prompt += codeBlock(describeComponentTree(failureData.componentTree, ""));
+      break;
     default:
       throw new Error(`Unknown failure kind: ${(failureData as any).kind}`);
   }
 
-  const annotatedSource = await annotateSource(repositoryContents, fileName, pointText, annotation);
+  if (failurePoint) {
+    assert(annotation);
+    const pointText = failurePoint.location.source.trim();
+    const fileName = trimFileName(failurePoint.location.url);
+    const annotatedSource = await annotateSource(repositoryContents, fileName, pointText, annotation);
+    prompt += `Here is the affected code, in ${fileName}:\n\n`;
+    prompt += codeBlock(annotatedSource);
+  }
 
-  prompt += `Here is the affected code, in ${fileName}:\n\n`;
-  prompt += "```\n" + annotatedSource + "```\n";
   return prompt;
 }
 
@@ -218,12 +249,9 @@ export async function getSimulationEnhancedPrompt(recordingId: string, repositor
     const { points, failureData } = rval;
     assert(failureData, "No failure data");
 
-    const failurePoint = points.find(p => p.point === failureData.point);
-    assert(failurePoint, "No failure point");
-
     console.log("FailureData", JSON.stringify(failureData, null, 2));
 
-    const prompt = await enhancePromptFromFailureData(failurePoint, failureData, repositoryContents);
+    const prompt = await enhancePromptFromFailureData(points, failureData, repositoryContents);
     console.log("Enhanced prompt", prompt);
     return prompt;
   } finally {
