@@ -26,7 +26,6 @@ import { getSimulationRecording, getSimulationEnhancedPrompt } from '~/lib/repla
 import { getIFrameSimulationData, type SimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '../workbench/Preview';
 import { getCurrentMouseData } from '../workbench/PointSelector';
-import { assert } from '~/lib/replay/ReplayProtocolClient';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
@@ -284,7 +283,8 @@ export const ChatImpl = memo(
     const getEnhancedPrompt = async (recordingId: string, repositoryContents: string) => {
       let enhancedPrompt, message;
       try {
-        enhancedPrompt = await getSimulationEnhancedPrompt(recordingId, repositoryContents);
+        const mouseData = getCurrentMouseData();
+        enhancedPrompt = await getSimulationEnhancedPrompt(recordingId, repositoryContents, mouseData);
         message = `Explanation of the bug:\n\n${enhancedPrompt}`;
       } catch (e) {
         console.error("Error enhancing prompt", e);
