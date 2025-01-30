@@ -285,9 +285,7 @@ export const ChatImpl = memo(
       let enhancedPrompt, message;
       try {
         const mouseData = getCurrentMouseData();
-        console.log("MouseData", mouseData);
-
-        enhancedPrompt = await getSimulationEnhancedPrompt(recordingId, messages, userMessage);
+        enhancedPrompt = await getSimulationEnhancedPrompt(recordingId, messages, userMessage, mouseData);
         message = `Explanation of the bug:\n\n${enhancedPrompt}`;
       } catch (e) {
         console.error("Error enhancing prompt", e);

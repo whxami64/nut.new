@@ -5,6 +5,7 @@ import type { Message } from 'ai';
 import type { SimulationData } from './SimulationData';
 import { SimulationDataVersion } from './SimulationData';
 import { assert, ProtocolClient } from './ReplayProtocolClient';
+import type { MouseData } from './Recording';
 
 export async function getSimulationRecording(
   simulationData: SimulationData,
@@ -56,7 +57,8 @@ Do not describe the specific fix needed.
 export async function getSimulationEnhancedPrompt(
   recordingId: string,
   chatMessages: Message[],
-  userMessage: string
+  userMessage: string,
+  mouseData: MouseData | undefined
 ): Promise<string> {
   const client = new ProtocolClient();
   await client.initialize();
@@ -68,11 +70,16 @@ export async function getSimulationEnhancedPrompt(
       params: { chatId, recordingId },
     });
 
+    let system = SystemPrompt;
+    if (mouseData) {
+      system += `The user pointed to an element on the page <element selector=${JSON.stringify(mouseData.selector)} height=${mouseData.height} width=${mouseData.width} x=${mouseData.x} y=${mouseData.y} />`;
+    }
+
     const messages = [
       {
         role: "system",
         type: "text",
-        content: SystemPrompt,
+        content: system,
       },
       {
         role: "user",
@@ -80,6 +87,8 @@ export async function getSimulationEnhancedPrompt(
         content: userMessage,
       },
     ];
+
+    console.log("ChatSendMessage", messages);
 
     let response: string = "";
     const removeListener = client.listenForMessage("Nut.chatResponsePart", ({ message }: { message: ProtocolMessage }) => {
