@@ -24,7 +24,6 @@ export async function getIFrameSimulationData(iframe: HTMLIFrameElement): Promis
     });
   });
 
-  console.log("SimulationData", JSON.stringify(data));
   return data as SimulationData;
 }
 
