@@ -46,11 +46,7 @@ class ChatManager {
       assert(this.client, "Chat has been destroyed");
 
       await this.client.initialize();
-      await this.client.sendCommand({
-        method: "Recording.globalExperimentalCommand",
-        params: { name: "enableOperatorPods" },
-      });
-  
+
       const { chatId } = (await this.client.sendCommand({ method: "Nut.startChat", params: {} })) as { chatId: string };
       return chatId;  
     })();
