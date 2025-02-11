@@ -7,7 +7,7 @@ import { SimulationDataVersion } from './SimulationData';
 import { assert, ProtocolClient } from './ReplayProtocolClient';
 import type { MouseData } from './Recording';
 
-function createRepositoryContentsPacket(contents: string) {
+function createRepositoryContentsPacket(contents: string): SimulationPacket {
   return {
     kind: "repositoryContents",
     contents,
@@ -99,7 +99,7 @@ class ChatManager {
     });
   }
 
-  finishSimulationData() {
+  finishSimulationData(): SimulationData {
     assert(this.client, "Chat has been destroyed");
     assert(!this.simulationFinished, "Simulation has been finished");
     assert(this.repositoryContents, "Expected repository contents");
@@ -179,10 +179,20 @@ export async function simulationAddData(data: SimulationData) {
   gChatManager.addPageData(data);
 }
 
+let gLastUserSimulationData: SimulationData | undefined;
+
+export function getLastUserSimulationData(): SimulationData | undefined {
+  return gLastUserSimulationData;
+}
+
 export async function getSimulationRecording(): Promise<string> {
   assert(gChatManager, "Expected to have an active chat");
 
   const simulationData = gChatManager.finishSimulationData();
+
+  // The repository contents are part of the problem and excluded from the simulation data
+  // reported for solutions.
+  gLastUserSimulationData = simulationData.filter(packet => packet.kind != "repositoryContents");
 
   console.log("SimulationData", new Date().toISOString(), JSON.stringify(simulationData));
 

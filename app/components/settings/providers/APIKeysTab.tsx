@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 import Cookies from 'js-cookie';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
+import { setNutAdminKey, setProblemsUsername, getNutAdminKey, getProblemsUsername } from '~/lib/replay/Problems';
 
 export default function ConnectionsTab() {
   const [apiKey, setApiKey] = useState(Cookies.get(anthropicApiKeyCookieName) || '');
+  const [username, setUsername] = useState(getProblemsUsername() || '');
+  const [adminKey, setAdminKey] = useState(getNutAdminKey() || '');
   const numFreeUses = +(Cookies.get(anthropicNumFreeUsesCookieName) || 0);
 
   const handleSaveAPIKey = async (key: string) => {
@@ -15,6 +18,16 @@ export default function ConnectionsTab() {
 
     Cookies.set('anthropicApiKey', key);
     setApiKey(key);
+  };
+
+  const handleSaveUsername = async (username: string) => {
+    setProblemsUsername(username);
+    setUsername(username);
+  };
+
+  const handleSaveAdminKey = async (key: string) => {
+    setNutAdminKey(key);
+    setAdminKey(key);
   };
 
   return (
@@ -37,6 +50,28 @@ export default function ConnectionsTab() {
           </div>
         </div>
       )}
+      <h3 className="text-lg font-medium text-bolt-elements-textPrimary mb-4">Problems User Name</h3>
+      <div className="flex mb-4">
+        <div className="flex-1 mr-2">
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => handleSaveUsername(e.target.value)}
+            className="w-full bg-white dark:bg-bolt-elements-background-depth-4 relative px-2 py-1.5 rounded-md focus:outline-none placeholder-bolt-elements-textTertiary text-bolt-elements-textPrimary dark:text-bolt-elements-textPrimary border border-bolt-elements-borderColor disabled:opacity-50"
+          />
+        </div>
+      </div>
+      <h3 className="text-lg font-medium text-bolt-elements-textPrimary mb-4">Nut Admin Key</h3>
+      <div className="flex mb-4">
+        <div className="flex-1 mr-2">
+          <input
+            type="text"
+            value={adminKey}
+            onChange={(e) => handleSaveAdminKey(e.target.value)}
+            className="w-full bg-white dark:bg-bolt-elements-background-depth-4 relative px-2 py-1.5 rounded-md focus:outline-none placeholder-bolt-elements-textTertiary text-bolt-elements-textPrimary dark:text-bolt-elements-textPrimary border border-bolt-elements-borderColor disabled:opacity-50"
+          />
+        </div>
+      </div>
     </div>
   );
 }
