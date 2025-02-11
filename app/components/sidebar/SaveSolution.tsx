@@ -2,11 +2,10 @@ import { toast } from "react-toastify";
 import ReactModal from 'react-modal';
 import { useState } from "react";
 import { workbenchStore } from "~/lib/stores/workbench";
-import { BoltProblemStatus, getProblemsUsername, updateProblem } from "~/lib/replay/Problems";
+import { BoltProblemStatus, updateProblem } from "~/lib/replay/Problems";
 import type { BoltProblemInput } from "~/lib/replay/Problems";
 import { getLastLoadedProblem } from "../chat/LoadProblemButton";
-import { getLastUserSimulationData } from "~/lib/replay/SimulationPrompt";
-import { getLastUserPrompt } from "../chat/Chat.client";
+import { getLastUserSimulationData, getLastChatMessages } from "~/lib/replay/SimulationPrompt";
 
 ReactModal.setAppElement('#root');
 
@@ -52,8 +51,8 @@ export function SaveSolution() {
       return;
     }
 
-    const userPrompt = getLastUserPrompt();
-    if (!userPrompt) {
+    const messages = getLastChatMessages();
+    if (!messages) {
       toast.error('No user prompt found');
       return;
     }
@@ -71,7 +70,7 @@ export function SaveSolution() {
       status: BoltProblemStatus.Solved,
       solution: {
         simulationData,
-        userPrompt,
+        messages,
         evaluator: formData.evaluator,
       },
     };

@@ -74,12 +74,6 @@ setInterval(async () => {
   }
 }, 1000);
 
-let gLastUserPrompt: string | undefined = "app goes blank getting directions";
-
-export function getLastUserPrompt(): string | undefined {
-  return gLastUserPrompt;
-}
-
 export function Chat() {
   renderLogger.trace('Chat');
 
@@ -350,8 +344,6 @@ export const ChatImpl = memo(
       if (_input.length === 0 || isLoading) {
         return;
       }
-
-      gLastUserPrompt = _input;
 
       const anthropicApiKey = Cookies.get(anthropicApiKeyCookieName);
       if (!anthropicApiKey) {

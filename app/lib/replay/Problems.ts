@@ -2,6 +2,7 @@
 
 import { toast } from "react-toastify";
 import { sendCommandDedicatedClient } from "./ReplayProtocolClient";
+import type { ProtocolMessage } from "./SimulationPrompt";
 import Cookies from 'js-cookie';
 
 export interface BoltProblemComment {
@@ -12,7 +13,7 @@ export interface BoltProblemComment {
 
 export interface BoltProblemSolution {
   simulationData: any;
-  userPrompt: string;
+  messages: ProtocolMessage[];
   evaluator: string;
 }
 

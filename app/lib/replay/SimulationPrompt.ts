@@ -15,7 +15,7 @@ function createRepositoryContentsPacket(contents: string): SimulationPacket {
   };
 }
 
-type ProtocolMessage = {
+export type ProtocolMessage = {
   role: "user" | "assistant" | "system";
   type: "text";
   content: string;
@@ -200,6 +200,12 @@ export async function getSimulationRecording(): Promise<string> {
   return gChatManager.recordingIdPromise;
 }
 
+let gLastChatMessages: ProtocolMessage[] | undefined;
+
+export function getLastChatMessages(): ProtocolMessage[] | undefined {
+  return gLastChatMessages;
+}
+
 const SystemPrompt = `
 The following user message describes a bug or other problem on the page which needs to be fixed.
 You must respond with a useful explanation that will help the user understand the source of the problem.
@@ -231,6 +237,8 @@ export async function getSimulationEnhancedPrompt(
       content: userMessage,
     },
   ];
+
+  gLastChatMessages = messages;
 
   console.log("ChatSendMessage", messages);
 
