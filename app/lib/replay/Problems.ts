@@ -78,7 +78,13 @@ export async function getProblem(problemId: string): Promise<BoltProblem | null>
       },
     });
     console.log("FetchProblemRval", rv);
-    return (rv as { rval: { problem: BoltProblem } }).rval.problem;
+    const problem = (rv as { rval: { problem: BoltProblem } }).rval.problem;
+    if ("prompt" in problem) {
+      // 2/11/2025: Update obsolete data format for older problems.
+      problem.repositoryContents = (problem as any).prompt.content;
+      delete problem.prompt;
+    }
+    return problem;
   } catch (error) {
     console.error("Error fetching problem", error);
     toast.error("Failed to fetch problem");
