@@ -14,7 +14,11 @@ interface LoadProblemButtonProps {
 }
 
 export function setLastLoadedProblem(problem: BoltProblem) {
-  localStorage.setItem('loadedProblem', JSON.stringify(problem));
+  try {
+    localStorage.setItem('loadedProblem', JSON.stringify(problem));
+  } catch (error) {
+    console.error('Failed to set last loaded problem:', error);
+  }
 }
 
 export function getLastLoadedProblem(): BoltProblem | undefined {

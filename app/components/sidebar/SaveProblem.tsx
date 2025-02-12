@@ -7,6 +7,8 @@ import type { BoltProblemInput } from "~/lib/replay/Problems";
 
 ReactModal.setAppElement('#root');
 
+// Component for saving the current chat as a new problem.
+
 export function SaveProblem() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

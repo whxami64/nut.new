@@ -9,6 +9,9 @@ import { getLastUserSimulationData, getLastChatMessages } from "~/lib/replay/Sim
 
 ReactModal.setAppElement('#root');
 
+// Component for saving input simulation and prompt information for
+// the problem the current chat was loaded from.
+
 export function SaveSolution() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,12 +36,6 @@ export function SaveSolution() {
   };
 
   const handleSubmitSolution = async () => {
-    // Add validation here
-    if (!formData.evaluator) {
-      toast.error('Please fill in evaluator field');
-      return;
-    }
-
     const savedProblem = getLastLoadedProblem();
     if (!savedProblem) {
       toast.error('No problem loaded');
@@ -61,17 +58,22 @@ export function SaveSolution() {
 
     console.log("SubmitSolution", formData);
 
+    // The evaluator is only present when the problem has been solved.
+    // We still create a "solution" object even if it hasn't been
+    // solved quite yet, which is used for working on the problem.
+    const evaluator = formData.evaluator.length ? formData.evaluator : undefined;
+
     const problem: BoltProblemInput = {
       version: 2,
       title: savedProblem.title,
       description: savedProblem.description,
       username: savedProblem.username,
       repositoryContents: savedProblem.repositoryContents,
-      status: BoltProblemStatus.Solved,
+      status: evaluator ? BoltProblemStatus.Solved : BoltProblemStatus.Unsolved,
       solution: {
         simulationData,
         messages,
-        evaluator: formData.evaluator,
+        evaluator,
       },
     };
 
@@ -109,6 +111,7 @@ export function SaveSolution() {
           <>
             <div className="text-center">Save solution for loaded problem from last prompt and recording.</div>
             <div className="text-center">Evaluator describes a condition the explanation must satisfy.</div>
+            <div className="text-center">Leave the evaluator blank if the API explanation is not right and the problem isn't solved yet.</div>
             <div style={{ marginTop: "10px" }}>
               <div className="grid grid-cols-[auto_1fr] gap-4 max-w-md mx-auto">
                 <div className="flex items-center">Evaluator:</div>

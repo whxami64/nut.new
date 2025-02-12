@@ -14,7 +14,7 @@ export interface BoltProblemComment {
 export interface BoltProblemSolution {
   simulationData: any;
   messages: ProtocolMessage[];
-  evaluator: string;
+  evaluator?: string;
 }
 
 export enum BoltProblemStatus {
