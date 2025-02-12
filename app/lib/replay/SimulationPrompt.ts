@@ -236,7 +236,7 @@ export async function getSimulationEnhancedPrompt(
 
   gLastChatMessages = messages;
 
-  console.log("ChatSendMessage", messages);
+  console.log("ChatSendMessage", new Date().toISOString(), JSON.stringify(messages));
 
   return gChatManager.sendChatMessage(messages);
 }
