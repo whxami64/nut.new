@@ -6,7 +6,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { cssTransition, ToastContainer } from 'react-toastify';
 import { useEffect } from 'react';
 import { useState } from 'react';
-import { listAllProblems } from '~/lib/replay/Problems';
+import { BoltProblemStatus, listAllProblems } from '~/lib/replay/Problems';
 import type { BoltProblemDescription } from '~/lib/replay/Problems';
 
 const toastAnimation = cssTransition({
@@ -44,12 +44,64 @@ export function ToastContainerWrapper() {
   />
 }
 
+export function Status({ status }: { status: BoltProblemStatus | undefined }) {
+  if (!status) {
+    status = BoltProblemStatus.Pending;
+  }
+
+  const statusColors: Record<BoltProblemStatus, string> = {
+    [BoltProblemStatus.Pending]: 'bg-yellow-400',
+    [BoltProblemStatus.Unsolved]: 'bg-orange-500',
+    [BoltProblemStatus.Solved]: 'bg-blue-500'
+  };
+
+  return (
+    <div className="flex items-center gap-2 my-2">
+      <span className="font-semibold">Status:</span>
+      <div className={`inline-flex items-center px-3 py-1 rounded-full bg-opacity-10 ${statusColors[status]} text-${status}`}>
+        <span className={`w-2 h-2 rounded-full mr-2 ${statusColors[status]}`}></span>
+        <span className="font-medium">
+          {status.charAt(0).toUpperCase() + status.slice(1)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function Keywords({ keywords }: { keywords: string[] | undefined }) {
+  if (!keywords?.length) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-3">
+      {keywords.map((keyword, index) => (
+        <span
+          key={index}
+          className="px-3 py-1 text-sm rounded-full border border-bolt-elements-border bg-bolt-elements-background-depth-2 text-bolt-content-primary"
+        >
+          {keyword}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function getProblemStatus(problem: BoltProblemDescription): BoltProblemStatus {
+  return problem.status ?? BoltProblemStatus.Pending;
+}
+
 function ProblemsPage() {
   const [problems, setProblems] = useState<BoltProblemDescription[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<BoltProblemStatus | 'all'>(BoltProblemStatus.Solved);
 
   useEffect(() => {
     listAllProblems().then(setProblems);
   }, []);
+
+  const filteredProblems = problems?.filter(problem => {
+    return statusFilter === 'all' || getProblemStatus(problem) === statusFilter;
+  });
 
   return (
     <TooltipProvider>
@@ -57,8 +109,32 @@ function ProblemsPage() {
         <BackgroundRays />
         <Header />
         <ClientOnly>{() => <Menu />}</ClientOnly>
-        
+
         <div className="p-6">
+          {problems && <div className="mb-4">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as BoltProblemStatus | 'all')}
+              className="appearance-none w-48 px-4 py-2.5 rounded-lg bg-bolt-elements-background-depth-2 border border-bolt-elements-border text-bolt-content-primary hover:border-bolt-elements-border-hover focus:outline-none focus:ring-2 focus:ring-bolt-accent-primary/20 focus:border-bolt-accent-primary cursor-pointer relative pr-10"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                backgroundSize: '16px'
+              }}
+            >
+              <option value="all">{`All Problems (${problems?.length ?? 0})`}</option>
+              {Object.values(BoltProblemStatus).map((status) => {
+                const count = problems?.filter(problem => getProblemStatus(problem) === status).length ?? 0;
+                return (
+                  <option key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1) + ` (${count})`}
+                  </option>
+                );
+              })}
+            </select>
+          </div>}
+
           {problems === null ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -67,7 +143,7 @@ function ProblemsPage() {
             <div className="text-center text-gray-600">No problems found</div>
           ) : (
             <div className="grid gap-4">
-              {problems.map((problem) => (
+              {filteredProblems?.map((problem) => (
                 <a
                   href={`/problem/${problem.problemId}`}
                   key={problem.problemId}
@@ -75,6 +151,8 @@ function ProblemsPage() {
                 >
                   <h2 className="text-xl font-semibold mb-2">{problem.title}</h2>
                   <p className="text-gray-700 mb-2">{problem.description}</p>
+                  <Status status={problem.status} />
+                  <Keywords keywords={problem.keywords} />
                   <p className="text-sm text-gray-600">
                     Time: {new Date(problem.timestamp).toLocaleString()}
                   </p>
