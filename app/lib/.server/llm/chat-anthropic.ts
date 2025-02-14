@@ -113,16 +113,23 @@ async function restorePartialFile(
   existingContent: string,
   newContent: string,
   apiKey: string,
-  mainResponseText: string
+  mainResponseText: string,
+  responseDescription: string
 ) {
   const systemPrompt = `
-You are a helpful assistant that restores the content of a file to reflect partial updates made by another assistant.
+You are a helpful assistant that restores code skipped over by partial updates made by another assistant.
 
 You will be given the existing content for a file and the new content that may contain partial updates.
 Your task is to return complete restored content which both reflects the changes made in the new content
 and includes any code that was removed from the original file.
 
 Describe any places in the new content where code may have been removed.
+ULTRA IMPORTANT: Only remove content that has been skipped due to comments similar to the following:
+
+// rest of the code remains the same.
+// this function is unchanged.
+
+ULTRA IMPORTANT: Do not restore content that was intentionally removed by the other assistant.
 ULTRA IMPORTANT: The restored content should be returned in the following format:
 
 <restoredContent>
@@ -142,6 +149,11 @@ The new content that may contain partial updates is:
 <newContent>
 ${newContent}
 </newContent>
+
+The other assistant's description of its changes is:
+<description>
+${responseDescription}
+</description>
   `;
 
   const messages: MessageParam[] = [
@@ -179,6 +191,29 @@ ${newContent}
   return { restoreCall, newResponseText };
 }
 
+// Return the english description in a model response, skipping over any artifacts.
+function getMessageDescription(responseText: string): string {
+  const OpenTag = "<boltArtifact";
+  const CloseTag = "</boltArtifact>";
+
+  while (true) {
+    const openTag = responseText.indexOf(OpenTag);
+    if (openTag === -1) {
+      break;
+    }
+
+    const prefix = responseText.substring(0, openTag);
+
+    const closeTag = responseText.indexOf(CloseTag, openTag + OpenTag.length);
+    if (closeTag === -1) {
+      responseText = prefix;
+    } else {
+      responseText = prefix + responseText.substring(closeTag + CloseTag.length);
+    }
+  }
+  return responseText;
+}
+
 interface FileContents {
   filePath: string;
   content: string;
@@ -202,6 +237,7 @@ async function restorePartialFiles(files: FileMap, apiKey: string, responseText:
   });
 
   messageParser.parse("restore-partial-files-message-id", responseText);
+  const responseDescription = getMessageDescription(responseText);
 
   const restoreCalls: AnthropicCall[] = [];
   for (const file of fileContents) {
@@ -209,7 +245,13 @@ async function restorePartialFiles(files: FileMap, apiKey: string, responseText:
     const newContent = file.content;
 
     if (shouldRestorePartialFile(existingContent, newContent)) {
-      const { restoreCall, newResponseText } = await restorePartialFile(existingContent, newContent, apiKey, responseText);
+      const { restoreCall, newResponseText } = await restorePartialFile(
+        existingContent,
+        newContent,
+        apiKey,
+        responseText,
+        responseDescription
+      );
       restoreCalls.push(restoreCall);
       responseText = newResponseText;
     }
