@@ -71,7 +71,14 @@ export function wrapWithSpan<Args extends any[], T>(
   fn: (...args: Args) => Promise<T>,
 ): (...args: Args) => Promise<T> {
   return async (...args: Args) => {
-    console.log("WrapWithSpan", opts.name, otelInitialized, process.env.HONEYCOMB_API_KEY, process.env.HONEYCOMB_DATASET);
+    console.log(
+      "WrapWithSpan",
+      opts.name,
+      otelInitialized,
+      process.env.ANTHROPIC_API_KEY,
+      process.env.HONEYCOMB_API_KEY,
+      process.env.HONEYCOMB_DATASET,
+    );
 
     return tracer.startActiveSpan(opts.name, async (span) => {
       if (opts.attrs) {
