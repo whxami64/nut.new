@@ -55,8 +55,10 @@ export function Feedback() {
       feedbackData.chatMessages = getLastChatMessages();
     }
 
-    await submitFeedback(feedbackData);
-    setSubmitted(true);
+    const success = await submitFeedback(feedbackData);
+    if (success) {
+      setSubmitted(true);
+    }
   }
 
   return (

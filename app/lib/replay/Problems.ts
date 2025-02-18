@@ -177,10 +177,10 @@ export async function submitFeedback(feedback: any) {
       },
     });
     console.log("SubmitFeedbackRval", rv);
-    return (rv as any).rval.problemId;
+    return true;
   } catch (error) {
     console.error("Error submitting feedback", error);
     toast.error("Failed to submit feedback");
-    return null;
+    return false;
   }
 }
