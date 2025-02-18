@@ -48,6 +48,18 @@ export function resetChatFileWritten() {
   }, 500);
 }
 
+let gLastProjectContents: string | undefined;
+
+export function getLastProjectContents() {
+  return gLastProjectContents;
+}
+
+let gLastChatMessages: Message[] | undefined;
+
+export function getLastChatMessages() {
+  return gLastChatMessages;
+}
+
 async function flushSimulationData() {
   //console.log("FlushSimulationData");
 
@@ -427,6 +439,7 @@ export const ChatImpl = memo(
       if (lastMessage) {
         const { contentBase64 } = await workbenchStore.generateZipBase64();
         saveProjectContents(lastMessage.id, { content: contentBase64 });
+        gLastProjectContents = contentBase64;
       }
     };
 
@@ -468,6 +481,19 @@ export const ChatImpl = memo(
 
     const [messageRef, scrollRef] = useSnapScroll();
 
+    const chatMessages = messages.map((message, i) => {
+      if (message.role === 'user') {
+        return message;
+      }
+
+      return {
+        ...message,
+        content: parsedMessages[i] || '',
+      };
+    });
+
+    gLastChatMessages = chatMessages;
+
     return (
       <BaseChat
         ref={animationScope}
@@ -489,16 +515,7 @@ export const ChatImpl = memo(
         description={description}
         importChat={importChat}
         exportChat={exportChat}
-        messages={messages.map((message, i) => {
-          if (message.role === 'user') {
-            return message;
-          }
-
-          return {
-            ...message,
-            content: parsedMessages[i] || '',
-          };
-        })}
+        messages={chatMessages}
         enhancePrompt={() => {
           enhancePrompt(
             input,
