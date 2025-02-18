@@ -5,48 +5,66 @@ import { ConsoleSpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-tra
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { ZoneContextManager } from '@opentelemetry/context-zone';
 import { SpanStatusCode, type Attributes, context, trace } from '@opentelemetry/api';
+import type { Tracer } from '@opentelemetry/api';
+import type { AppLoadContext } from '@remix-run/cloudflare';
 
-let otelInitialized = false;
-
-function initializeOpenTelemetry() {
-  const honeycombApiKey = process.env.HONEYCOMB_API_KEY;
-  const honeycombDataset = process.env.HONEYCOMB_DATASET;
+export function createTracer(context: AppLoadContext) {
+  const honeycombApiKey = (context.cloudflare.env as any).HONEYCOMB_API_KEY;
+  const honeycombDataset = (context.cloudflare.env as any).HONEYCOMB_DATASET;
 
   if (!honeycombApiKey || !honeycombDataset) {
     console.warn('OpenTelemetry initialization skipped: HONEYCOMB_API_KEY and/or HONEYCOMB_DATASET not set');
-    return trace.getTracerProvider().getTracer('nut-server');
+    return undefined;
   }
 
   console.warn('Initializing OpenTelemetry');
 
-  const exporter = new OTLPTraceExporter({
-    url: 'https://api.honeycomb.io/v1/traces',
-    headers: {
-      'x-honeycomb-team': honeycombApiKey,
-      'x-honeycomb-dataset': honeycombDataset,
-    },
-  });
+  try {
+    const exporter = new OTLPTraceExporter({
+      url: 'https://api.honeycomb.io/v1/traces',
+      headers: {
+        'x-honeycomb-team': honeycombApiKey,
+        'x-honeycomb-dataset': honeycombDataset,
+      },
+    });
 
-  const resource = new Resource({
-    [ATTR_SERVICE_NAME]: 'nut.server',
-    [ATTR_SERVICE_VERSION]: `${__APP_VERSION}; ${__COMMIT_HASH}`,
-  });
+    const resource = new Resource({
+      [ATTR_SERVICE_NAME]: 'nut.server',
+      [ATTR_SERVICE_VERSION]: `${__APP_VERSION}; ${__COMMIT_HASH}`,
+    });
 
-  const provider = new WebTracerProvider({
-    resource,
-    spanProcessors: [new SimpleSpanProcessor(exporter), new SimpleSpanProcessor(new ConsoleSpanExporter())],
-  });
+    const provider = new WebTracerProvider({
+      resource,
+      spanProcessors: [new SimpleSpanProcessor(exporter), new SimpleSpanProcessor(new ConsoleSpanExporter())],
+    });
 
-  provider.register({
-    contextManager: new ZoneContextManager(),
-  });
+    provider.register({
+      contextManager: new ZoneContextManager(),
+    });
 
-  otelInitialized = true;
-
-  return provider.getTracer('nut-server');
+    return provider.getTracer('nut-server');
+  } catch (e) {
+    console.error('Error initializing OpenTelemetry', e);
+    return undefined;
+  }
 }
 
-const tracer = initializeOpenTelemetry();
+let tracer: Tracer | undefined;
+
+export function ensureOpenTelemetryInitialized(context: AppLoadContext) {
+  if (tracer) {
+    return;
+  }
+
+  tracer = createTracer(context);
+}
+
+export function ensureTracer() {
+  if (!tracer) {
+    tracer = trace.getTracerProvider().getTracer('nut-server');
+  }
+  return tracer;
+}
 
 class NormalizedError extends Error {
   value: unknown;
@@ -71,16 +89,7 @@ export function wrapWithSpan<Args extends any[], T>(
   fn: (...args: Args) => Promise<T>,
 ): (...args: Args) => Promise<T> {
   return async (...args: Args) => {
-    console.log(
-      "WrapWithSpan",
-      opts.name,
-      otelInitialized,
-      process.env.ANTHROPIC_API_KEY,
-      process.env.HONEYCOMB_API_KEY,
-      process.env.HONEYCOMB_DATASET,
-    );
-
-    return tracer.startActiveSpan(opts.name, async (span) => {
+    return ensureTracer().startActiveSpan(opts.name, async (span) => {
       if (opts.attrs) {
         span.setAttributes(opts.attrs);
       }
