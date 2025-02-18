@@ -1,10 +1,12 @@
 import { Resource } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { ConsoleSpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { ZoneContextManager } from '@opentelemetry/context-zone';
 import { SpanStatusCode, type Attributes, context, trace } from '@opentelemetry/api';
+
+let otelInitialized = false;
 
 function initializeOpenTelemetry() {
   const honeycombApiKey = process.env.HONEYCOMB_API_KEY;
@@ -27,6 +29,7 @@ function initializeOpenTelemetry() {
 
   const resource = new Resource({
     [ATTR_SERVICE_NAME]: 'nut.server',
+    [ATTR_SERVICE_VERSION]: `${__APP_VERSION}; ${__COMMIT_HASH}`,
   });
 
   const provider = new WebTracerProvider({
@@ -37,6 +40,8 @@ function initializeOpenTelemetry() {
   provider.register({
     contextManager: new ZoneContextManager(),
   });
+
+  otelInitialized = true;
 
   return provider.getTracer('nut-server');
 }
@@ -66,6 +71,10 @@ export function wrapWithSpan<Args extends any[], T>(
   fn: (...args: Args) => Promise<T>,
 ): (...args: Args) => Promise<T> {
   return async (...args: Args) => {
+    if (!otelInitialized) {
+      console.warn("OpenTelemetry not initialized, skipping span creation");
+    }
+
     return tracer.startActiveSpan(opts.name, async (span) => {
       if (opts.attrs) {
         span.setAttributes(opts.attrs);
