@@ -213,7 +213,7 @@ export const ChatImpl = memo(
     }, [searchParams]);
 
     const { enhancingPrompt, promptEnhanced, enhancePrompt, resetEnhancer } = usePromptEnhancer();
-    const { parsedMessages, parseMessages } = useMessageParser();
+    const { parsedMessages, setParsedMessages, parseMessages } = useMessageParser();
 
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
 
@@ -437,6 +437,11 @@ export const ChatImpl = memo(
 
       const messageIndex = messages.findIndex((message) => message.id === messageId);
       if (messageIndex >= 0) {
+        const newParsedMessages = { ...parsedMessages };
+        for (let i = messageIndex + 1; i < messages.length; i++) {
+          delete newParsedMessages[i];
+        }
+        setParsedMessages(newParsedMessages);
         setMessages(messages.slice(0, messageIndex + 1));
       }
     };
