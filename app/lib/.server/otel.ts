@@ -71,9 +71,7 @@ export function wrapWithSpan<Args extends any[], T>(
   fn: (...args: Args) => Promise<T>,
 ): (...args: Args) => Promise<T> {
   return async (...args: Args) => {
-    if (!otelInitialized) {
-      console.warn("OpenTelemetry not initialized, skipping span creation");
-    }
+    console.log("WrapWithSpan", opts.name, otelInitialized, process.env.HONEYCOMB_API_KEY, process.env.HONEYCOMB_DATASET);
 
     return tracer.startActiveSpan(opts.name, async (span) => {
       if (opts.attrs) {
