@@ -54,9 +54,11 @@ function AboutPage() {
           </p>
 
           <p className="mb-6">
-            These are early days for Nut and it isn't very capable yet. To help with development
-            we're building a public collection of problems that AIs get stuck on, which you can browse or submit
-            new problems to using the sidebar menu.
+            Nut.new is already pretty good at fixing problems, and we’re working to make it better.
+            We want it to reliably fix anything you’re seeing, as long as it has a clear explanation
+            and the problem isn’t too complicated (AIs aren’t magic).  If it’s doing poorly, let us know!
+            Use the UI to leave us some private feedback or save your project to our public set of problems
+            where AIs struggle.
           </p>
 
           <p>
@@ -69,14 +71,15 @@ function AboutPage() {
             >
               Replay.io
             </a>{' '}
-            team. We'd love to hear from you! Reach us at{' '}
+            team.
+            We're offering unlimited free access to Nut.new for early adopters who can give us feedback
+            we'll use to improve Nut. Reach us at{' '}
             <a
               href="mailto:hi@replay.io"
               className="text-bolt-elements-accent underline hover:no-underline"
             >
               hi@replay.io
-            </a>{' '}
-            or fill out our{' '}
+            </a>{' '} or fill out our{' '}
             <a
               href="https://replay.io/contact"
               className="text-bolt-elements-accent underline hover:no-underline"
@@ -85,7 +88,7 @@ function AboutPage() {
             >
               contact form
             </a>{' '}
-            and we'll be in touch.
+            to join our early adopter program.
           </p>
         </div>
       </div>
