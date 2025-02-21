@@ -336,11 +336,6 @@ export const ChatImpl = memo(
       }
 
       const loginKey = getNutLoginKey();
-      if (!loginKey) {
-        toast.error('Please set a login key in the "User Info" settings.');
-        return;
-      }
-
       const anthropicApiKey = Cookies.get(anthropicApiKeyCookieName);
 
       if (!loginKey && !anthropicApiKey) {
