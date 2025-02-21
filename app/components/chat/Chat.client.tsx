@@ -336,7 +336,9 @@ export const ChatImpl = memo(
       }
 
       const loginKey = getNutLoginKey();
-      const anthropicApiKey = Cookies.get(anthropicApiKeyCookieName);
+
+      const apiKeyCookie = Cookies.get(anthropicApiKeyCookieName);
+      const anthropicApiKey = apiKeyCookie?.length ? apiKeyCookie : undefined;
 
       if (!loginKey && !anthropicApiKey) {
         const numFreeUses = +(Cookies.get(anthropicNumFreeUsesCookieName) || 0);

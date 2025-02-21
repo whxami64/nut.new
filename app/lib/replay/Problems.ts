@@ -134,7 +134,8 @@ const nutLoginKeyCookieName = 'nutLoginKey';
 const nutIsAdminCookieName = 'nutIsAdmin';
 
 export function getNutLoginKey(): string | undefined {
-  return Cookies.get(nutLoginKeyCookieName);
+  const cookieValue = Cookies.get(nutLoginKeyCookieName);
+  return cookieValue?.length ? cookieValue : undefined;
 }
 
 export function getNutIsAdmin(): boolean {
@@ -169,7 +170,8 @@ export function setNutIsAdmin(isAdmin: boolean) {
 const nutProblemsUsernameCookieName = 'nutProblemsUsername';
 
 export function getProblemsUsername(): string | undefined {
-  return Cookies.get(nutProblemsUsernameCookieName);
+  const cookieValue = Cookies.get(nutProblemsUsernameCookieName);
+  return cookieValue?.length ? cookieValue : undefined;
 }
 
 export function saveProblemsUsername(username: string) {
