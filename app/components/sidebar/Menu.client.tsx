@@ -13,7 +13,7 @@ import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { SaveProblem } from './SaveProblem';
 import { SaveSolution } from './SaveSolution';
-import { hasNutAdminKey } from '~/lib/replay/Problems';
+import { getNutIsAdmin } from '~/lib/replay/Problems';
 
 const menuVariants = {
   closed: {
@@ -140,7 +140,7 @@ export const Menu = () => {
             Problems
           </a>
           <SaveProblem />
-          {hasNutAdminKey() && <SaveSolution />}
+          {getNutIsAdmin() && <SaveSolution />}
           <a
             href="/about"
             className="flex gap-2 bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"

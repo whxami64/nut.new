@@ -111,15 +111,17 @@ export async function submitProblem(problem: BoltProblemInput): Promise<string |
 
 export async function updateProblem(problemId: string, problem: BoltProblemInput) {
   try {
-    const adminKey = Cookies.get(nutAdminKeyCookieName);
-    if (!adminKey) {
-      toast.error("Admin key not specified");
+    if (!getNutIsAdmin()) {
+      toast.error("Admin user required");
+      return;
     }
+
+    const loginKey = Cookies.get(nutLoginKeyCookieName);
     await sendCommandDedicatedClient({
       method: "Recording.globalExperimentalCommand",
       params: {
         name: "updateBoltProblem",
-        params: { problemId, problem, adminKey },
+        params: { problemId, problem, loginKey },
       },
     });
   } catch (error) {
@@ -128,18 +130,40 @@ export async function updateProblem(problemId: string, problem: BoltProblemInput
   }
 }
 
-const nutAdminKeyCookieName = 'nutAdminKey';
+const nutLoginKeyCookieName = 'nutLoginKey';
+const nutIsAdminCookieName = 'nutIsAdmin';
 
-export function getNutAdminKey(): string | undefined {
-  return Cookies.get(nutAdminKeyCookieName);
+export function getNutLoginKey(): string | undefined {
+  return Cookies.get(nutLoginKeyCookieName);
 }
 
-export function hasNutAdminKey(): boolean {
-  return !!getNutAdminKey();
+export function getNutIsAdmin(): boolean {
+  return Cookies.get(nutIsAdminCookieName) === 'true';
 }
 
-export function setNutAdminKey(key: string) {
-  Cookies.set(nutAdminKeyCookieName, key);
+interface UserInfo {
+  username: string;
+  loginKey: string;
+  details: string;
+  admin: boolean;
+}
+
+export async function saveNutLoginKey(key: string) {
+  const { rval: { userInfo } } = await sendCommandDedicatedClient({
+    method: "Recording.globalExperimentalCommand",
+    params: {
+      name: "getUserInfo",
+      params: { loginKey: key },
+    },
+  }) as { rval: { userInfo: UserInfo } };
+  console.log("UserInfo", userInfo);
+
+  Cookies.set(nutLoginKeyCookieName, key);
+  Cookies.set(nutIsAdminCookieName, userInfo.admin ? 'true' : 'false');
+}
+
+export function setNutIsAdmin(isAdmin: boolean) {
+  Cookies.set(nutIsAdminCookieName, isAdmin ? 'true' : 'false');
 }
 
 const nutProblemsUsernameCookieName = 'nutProblemsUsername';
@@ -148,7 +172,7 @@ export function getProblemsUsername(): string | undefined {
   return Cookies.get(nutProblemsUsernameCookieName);
 }
 
-export function setProblemsUsername(username: string) {
+export function saveProblemsUsername(username: string) {
   Cookies.set(nutProblemsUsernameCookieName, username);
 }
 

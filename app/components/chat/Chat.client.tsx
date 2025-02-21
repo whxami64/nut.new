@@ -29,6 +29,7 @@ import { getCurrentMouseData } from '../workbench/PointSelector';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
+import { getNutLoginKey } from '~/lib/replay/Problems';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -334,11 +335,18 @@ export const ChatImpl = memo(
         return;
       }
 
+      const loginKey = getNutLoginKey();
+      if (!loginKey) {
+        toast.error('Please set a login key in the "User Info" settings.');
+        return;
+      }
+
       const anthropicApiKey = Cookies.get(anthropicApiKeyCookieName);
-      if (!anthropicApiKey) {
+
+      if (!loginKey && !anthropicApiKey) {
         const numFreeUses = +(Cookies.get(anthropicNumFreeUsesCookieName) || 0);
         if (numFreeUses >= MaxFreeUses) {
-          toast.error('All free uses consumed. Please set an Anthropic API key in the settings.');
+          toast.error('All free uses consumed. Please set a login key or Anthropic API key in the "User Info" settings.');
           return;
         }
 
@@ -412,7 +420,7 @@ export const ChatImpl = memo(
             image: imageData,
           })),
         ] as any, // Type assertion to bypass compiler check
-      }, { body: { simulationEnhancedPrompt, anthropicApiKey } });
+      }, { body: { simulationEnhancedPrompt, anthropicApiKey, loginKey } });
 
       if (fileModifications !== undefined) {
         /**

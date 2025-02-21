@@ -18,12 +18,13 @@ Focus specifically on fixing this bug. Do not guess about other problems.
 async function chatAction({ context, request }: ActionFunctionArgs) {
   ensureOpenTelemetryInitialized(context);
 
-  const { messages, files, promptId, simulationEnhancedPrompt, anthropicApiKey: clientAnthropicApiKey } = await request.json<{
+  const { messages, files, promptId, simulationEnhancedPrompt, anthropicApiKey: clientAnthropicApiKey, loginKey } = await request.json<{
     messages: Messages;
     files: FileMap;
     promptId?: string;
     simulationEnhancedPrompt?: string;
     anthropicApiKey?: string;
+    loginKey?: string;
   }>();
 
   let finished: (v?: any) => void;
@@ -49,6 +50,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     const anthropicApiKey: AnthropicApiKey = {
       key: apiKey,
       isUser: !!clientAnthropicApiKey,
+      userLoginKey: loginKey,
     };
 
     const resultStream = new ReadableStream({

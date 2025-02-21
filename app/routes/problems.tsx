@@ -4,8 +4,7 @@ import { Menu } from '~/components/sidebar/Menu.client';
 import BackgroundRays from '~/components/ui/BackgroundRays';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { cssTransition, ToastContainer } from 'react-toastify';
-import { useEffect } from 'react';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { BoltProblemStatus, listAllProblems } from '~/lib/replay/Problems';
 import type { BoltProblemDescription } from '~/lib/replay/Problems';
 
@@ -91,6 +90,8 @@ function getProblemStatus(problem: BoltProblemDescription): BoltProblemStatus {
   return problem.status ?? BoltProblemStatus.Pending;
 }
 
+const Nothing = () => null;
+
 function ProblemsPage() {
   const [problems, setProblems] = useState<BoltProblemDescription[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<BoltProblemStatus | 'all'>(BoltProblemStatus.Solved);
@@ -104,6 +105,7 @@ function ProblemsPage() {
   });
 
   return (
+    <Suspense fallback={<Nothing />}>
     <TooltipProvider>
       <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1">
         <BackgroundRays />
@@ -164,6 +166,7 @@ function ProblemsPage() {
         <ToastContainerWrapper />
       </div>
     </TooltipProvider>
+    </Suspense>
   );
 }
 

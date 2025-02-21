@@ -27,6 +27,7 @@ function convertContentToAnthropic(content: any): ContentBlockParam[] {
 export interface AnthropicApiKey {
   key: string;
   isUser: boolean;
+  userLoginKey?: string;
 }
 export interface AnthropicCall {
   systemPrompt: string;
@@ -52,6 +53,7 @@ const callAnthropic = wrapWithSpan(
       "llm.chat.calls": 1, // so we can SUM(llm.chat.calls) without doing a COUNT + filter
       "llm.chat.num_messages": messages.length,
       "llm.chat.is_user_api_key": apiKey.isUser,
+      "llm.chat.user_login_key": apiKey.userLoginKey,
     });
 
     const anthropic = new Anthropic({ apiKey: apiKey.key });

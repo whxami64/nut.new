@@ -5,11 +5,10 @@ import BackgroundRays from '~/components/ui/BackgroundRays';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ToastContainerWrapper, Status, Keywords } from './problems';
 import { toast } from 'react-toastify';
-import { useCallback, useEffect } from 'react';
-import { useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams } from '@remix-run/react';
-import { getProblem, updateProblem as backendUpdateProblem, getProblemsUsername, BoltProblemStatus, hasNutAdminKey } from '~/lib/replay/Problems';
-import type { BoltProblem, BoltProblemComment, BoltProblemInput } from '~/lib/replay/Problems';
+import { getProblem, updateProblem as backendUpdateProblem, getProblemsUsername, BoltProblemStatus, getNutIsAdmin } from '~/lib/replay/Problems';
+import type { BoltProblem, BoltProblemComment } from '~/lib/replay/Problems';
 
 function Comments({ comments }: { comments: BoltProblemComment[] }) {
   return (
@@ -152,6 +151,8 @@ function UpdateProblemForms({ updateProblem }: { updateProblem: UpdateProblemCal
   )
 }
 
+const Nothing = () => null;
+
 function ViewProblemPage() {
   const params = useParams();
   const problemId = params.id;
@@ -177,6 +178,7 @@ function ViewProblemPage() {
   }, [problemId]);
 
   return (
+    <Suspense fallback={<Nothing />}>
     <TooltipProvider>
       <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1">
         <BackgroundRays />
@@ -190,12 +192,13 @@ function ViewProblemPage() {
               </div>)
            : <ProblemViewer problem={problemData} />}
         </div>
-        {hasNutAdminKey() && problemData && (
+        {getNutIsAdmin() && problemData && (
           <UpdateProblemForms updateProblem={updateProblem} />
         )}
         <ToastContainerWrapper />
       </div>
     </TooltipProvider>
+    </Suspense>
   );
 }
 
