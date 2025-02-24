@@ -7,7 +7,7 @@ import { StreamingMessageParser } from '~/lib/runtime/message-parser';
 import { extractRelativePath } from '~/utils/diff';
 import { wrapWithSpan, getCurrentSpan } from '~/lib/.server/otel';
 
-const Model = 'claude-3-5-sonnet-20241022';
+const Model = 'claude-3-7-sonnet-20250219';
 const MaxMessageTokens = 8192;
 
 function convertContentToAnthropic(content: any): ContentBlockParam[] {
