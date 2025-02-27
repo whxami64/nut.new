@@ -338,7 +338,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
   );
 
   function onInterceptedOperation(name: string) {
-    console.log(`InterceptedOperation ${name}`);
+    //console.log(`InterceptedOperation ${name}`);
   }
 
   function interceptProperty(obj: object, prop: string, interceptor: (basevalue: any) => any) {
