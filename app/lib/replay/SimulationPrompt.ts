@@ -132,6 +132,9 @@ class ChatManager {
 
     const responseId = "<response-id>";
     const chatId = await this.chatIdPromise;
+
+    console.log("ChatSendMessage", new Date().toISOString(), chatId, JSON.stringify(messages));
+
     await this.client.sendCommand({
       method: "Nut.sendChatMessage",
       params: { chatId, responseId, messages },
@@ -238,8 +241,6 @@ export async function getSimulationEnhancedPrompt(
   ];
 
   gLastSimulationChatMessages = messages;
-
-  console.log("ChatSendMessage", new Date().toISOString(), JSON.stringify(messages));
 
   return gChatManager.sendChatMessage(messages);
 }
