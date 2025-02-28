@@ -1,4 +1,4 @@
-import { captureRemixErrorBoundaryError } from '@sentry/remix';
+import { sentryHandleError } from '~/lib/sentry';
 import { useStore } from '@nanostores/react';
 import type { LinksFunction } from '@remix-run/cloudflare';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError } from '@remix-run/react';
@@ -83,7 +83,7 @@ import { logStore } from './lib/stores/logs';
 
 export const ErrorBoundary = () => {
   const error = useRouteError();
-  captureRemixErrorBoundaryError(error);
+  sentryHandleError(error as Error);
 
   return <div>Something went wrong</div>;
 };
