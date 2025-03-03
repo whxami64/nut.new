@@ -26,8 +26,9 @@ import { ModelSelector } from '~/components/chat/ModelSelector';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 import { ScreenshotStateManager } from './ScreenshotStateManager';
 import { toast } from 'react-toastify';
+import type { RejectChangeData } from './ApproveChange';
 
-const TEXTAREA_MIN_HEIGHT = 76;
+export const TEXTAREA_MIN_HEIGHT = 76;
 
 interface BaseChatProps {
   textareaRef?: React.RefObject<HTMLTextAreaElement> | undefined;
@@ -42,7 +43,7 @@ interface BaseChatProps {
   promptEnhanced?: boolean;
   input?: string;
   handleStop?: () => void;
-  sendMessage?: (event: React.UIEvent, messageInput?: string, simulation?: boolean) => void;
+  sendMessage?: (messageInput?: string) => void;
   handleInputChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   enhancePrompt?: () => void;
   importChat?: (description: string, messages: Message[]) => Promise<void>;
@@ -52,6 +53,9 @@ interface BaseChatProps {
   imageDataList?: string[];
   setImageDataList?: (dataList: string[]) => void;
   onRewind?: (messageId: string, contents: string) => void;
+  approveChangesMessageId?: string;
+  onApproveChange?: (messageId: string) => void;
+  onRejectChange?: (lastMessageId: string, rewindMessageId: string, contents: string, data: RejectChangeData) => void;
 }
 
 export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
@@ -79,6 +83,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       setImageDataList,
       messages,
       onRewind,
+      approveChangesMessageId,
+      onApproveChange,
+      onRejectChange,
     },
     ref,
   ) => {
@@ -139,9 +146,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     };
 
-    const handleSendMessage = (event: React.UIEvent, messageInput?: string, simulation?: boolean) => {
+    const handleSendMessage = (event: React.UIEvent, messageInput?: string) => {
       if (sendMessage) {
-        sendMessage(event, messageInput, simulation);
+        sendMessage(messageInput);
 
         if (recognition) {
           recognition.abort(); // Stop current recognition
@@ -244,6 +251,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       messages={messages}
                       isStreaming={isStreaming}
                       onRewind={onRewind}
+                      approveChangesMessageId={approveChangesMessageId}
+                      onApproveChange={onApproveChange}
+                      onRejectChange={onRejectChange}
                     />
                   ) : null;
                 }}
@@ -377,33 +387,15 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   />
                   <ClientOnly>
                     {() => (
-                      <>
-                        <SendButton
-                          show={input.length > 0 || isStreaming || uploadedFiles.length > 0}
-                          fixBug={false}
-                          isStreaming={isStreaming}
-                          onClick={(event) => {
-                            if (isStreaming) {
-                              handleStop?.();
-                              return;
-                            }
-
-                            if (input.length > 0 || uploadedFiles.length > 0) {
-                              handleSendMessage?.(event);
-                            }
-                          }}
-                        />
-                        <SendButton
-                          show={(input.length > 0 || uploadedFiles.length > 0) && chatStarted}
-                          fixBug={true}
-                          isStreaming={isStreaming}
-                          onClick={(event) => {
-                            if (input.length > 0 || uploadedFiles.length > 0) {
-                              handleSendMessage?.(event, undefined, true);
-                            }
-                          }}
-                        />
-                      </>
+                      <SendButton
+                        show={(input.length > 0 || uploadedFiles.length > 0) && chatStarted}
+                        isStreaming={isStreaming}
+                        onClick={(event) => {
+                          if (input.length > 0 || uploadedFiles.length > 0) {
+                            handleSendMessage?.(event);
+                          }
+                        }}
+                      />
                     )}
                   </ClientOnly>
                   <div className="flex justify-between items-center text-sm p-4 pt-2">

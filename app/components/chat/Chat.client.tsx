@@ -29,7 +29,10 @@ import { getCurrentMouseData } from '../workbench/PointSelector';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
-import { getNutLoginKey } from '~/lib/replay/Problems';
+import { getNutLoginKey, submitFeedback } from '~/lib/replay/Problems';
+import { shouldUseSimulation } from '~/lib/hooks/useSimulation';
+import { pingTelemetry } from '~/lib/hooks/pingTelemetry';
+import type { RejectChangeData } from './ApproveChange';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -185,6 +188,7 @@ export const ChatImpl = memo(
     const [simulationLoading, setSimulationLoading] = useState(false);
     const files = useStore(workbenchStore.files);
     const { promptId } = useSettings();
+    const [approveChangesMessageId, setApproveChangesMessageId] = useState<string | undefined>(undefined);
 
     const { showChat } = useStore(chatStore);
 
@@ -327,7 +331,7 @@ export const ChatImpl = memo(
       return { enhancedPrompt, enhancedPromptMessage };
     }
 
-    const sendMessage = async (_event: React.UIEvent, messageInput?: string, simulation?: boolean) => {
+    const sendMessage = async (messageInput?: string) => {
       const _input = messageInput || input;
       const numAbortsAtStart = gNumAborts;
 
@@ -363,6 +367,16 @@ export const ChatImpl = memo(
 
       let simulationEnhancedPrompt: string | undefined;
 
+      const simulation = await shouldUseSimulation(messages, _input);
+
+      if (numAbortsAtStart != gNumAborts) {
+        return;
+      }
+
+      console.log("UseSimulation", simulation);
+
+      let didEnhancePrompt = false;
+
       if (simulation) {
         gLockSimulationData = true;
         try {
@@ -388,6 +402,7 @@ export const ChatImpl = memo(
             }
 
             simulationEnhancedPrompt = info.enhancedPrompt;
+            didEnhancePrompt = true;
 
             console.log("EnhancedPromptMessage", info.enhancedPromptMessage);
             setMessages([...messages, info.enhancedPromptMessage]);
@@ -445,7 +460,15 @@ export const ChatImpl = memo(
         const { contentBase64 } = await workbenchStore.generateZipBase64();
         saveProjectContents(lastMessage.id, { content: contentBase64 });
         gLastProjectContents = contentBase64;
+        setApproveChangesMessageId(lastMessage.id);
       }
+
+      await pingTelemetry("Chat.SendMessage", {
+        numMessages: messages.length,
+        simulation,
+        didEnhancePrompt,
+        loginKey: getNutLoginKey(),
+      });
     };
 
     const onRewind = async (messageId: string, contents: string) => {
@@ -462,6 +485,83 @@ export const ChatImpl = memo(
         setParsedMessages(newParsedMessages);
         setMessages(messages.slice(0, messageIndex + 1));
       }
+
+      await pingTelemetry("Chat.Rewind", {
+        numMessages: messages.length,
+        rewindIndex: messageIndex,
+        loginKey: getNutLoginKey(),
+      });
+    };
+
+    const flashScreen = async () => {
+      const flash = document.createElement('div');
+      flash.style.position = 'fixed';
+      flash.style.top = '0';
+      flash.style.left = '0';
+      flash.style.width = '100%';
+      flash.style.height = '100%';
+      flash.style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
+      flash.style.zIndex = '9999';
+      flash.style.pointerEvents = 'none';
+      document.body.appendChild(flash);
+
+      // Fade out and remove after 500ms
+      setTimeout(() => {
+        flash.style.transition = 'opacity 0.5s';
+        flash.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(flash);
+        }, 500);
+      }, 200);
+    };
+
+    const onApproveChange = async (messageId: string) => {
+      console.log("ApproveChange", messageId);
+
+      setApproveChangesMessageId(undefined);
+
+      await flashScreen();
+
+      await pingTelemetry("Chat.ApproveChange", {
+        numMessages: messages.length,
+        loginKey: getNutLoginKey(),
+      });
+    };
+
+    const onRejectChange = async (messageId: string, rewindMessageId: string, projectContents: string, data: RejectChangeData) => {
+      console.log("RejectChange", messageId, data);
+
+      setApproveChangesMessageId(undefined);
+
+      const message = messages.find((message) => message.id === messageId);
+      const messageContents = message?.content ?? "";
+
+      await onRewind(rewindMessageId, projectContents);
+
+      let shareProjectSuccess = false;
+      if (data.shareProject) {
+        const feedbackData: any = {
+          explanation: data.explanation,
+          retry: data.retry,
+          chatMessages: messages,
+          repositoryContents: getLastProjectContents(),
+          loginKey: getNutLoginKey(),
+        };
+
+        shareProjectSuccess = await submitFeedback(feedbackData);
+      }
+
+      if (data.retry) {
+        sendMessage(messageContents);
+      }
+
+      await pingTelemetry("Chat.RejectChange", {
+        retry: data.retry,
+        shareProject: data.shareProject,
+        shareProjectSuccess,
+        numMessages: messages.length,
+        loginKey: getNutLoginKey(),
+      });
     };
 
     /**
@@ -535,6 +635,9 @@ export const ChatImpl = memo(
         imageDataList={imageDataList}
         setImageDataList={setImageDataList}
         onRewind={onRewind}
+        approveChangesMessageId={approveChangesMessageId}
+        onApproveChange={onApproveChange}
+        onRejectChange={onRejectChange}
       />
     );
   },
