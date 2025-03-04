@@ -49,16 +49,16 @@ export function Status({ status }: { status: BoltProblemStatus | undefined }) {
   }
 
   const statusColors: Record<BoltProblemStatus, string> = {
-    [BoltProblemStatus.Pending]: 'bg-yellow-400',
-    [BoltProblemStatus.Unsolved]: 'bg-orange-500',
-    [BoltProblemStatus.Solved]: 'bg-blue-500'
+    [BoltProblemStatus.Pending]: 'bg-yellow-400 dark:text-yellow-400',
+    [BoltProblemStatus.Unsolved]: 'bg-orange-500 dark:text-orange-500',
+    [BoltProblemStatus.Solved]: 'bg-blue-500 dark:text-blue-500'
   };
 
   return (
     <div className="flex items-center gap-2 my-2">
       <span className="font-semibold">Status:</span>
-      <div className={`inline-flex items-center px-3 py-1 rounded-full bg-opacity-10 ${statusColors[status]} text-${status}`}>
-        <span className={`w-2 h-2 rounded-full mr-2 ${statusColors[status]}`}></span>
+      <div className={`inline-flex items-center px-3 py-1 rounded-full bg-opacity-10 dark:bg-opacity-20 ${statusColors[status]}`}>
+        <span className={`w-2 h-2 rounded-full mr-2 ${statusColors[status]} bg-opacity-100`}></span>
         <span className="font-medium">
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </span>
@@ -107,7 +107,7 @@ function ProblemsPage() {
   return (
     <Suspense fallback={<Nothing />}>
     <TooltipProvider>
-      <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1">
+      <div className="flex flex-col min-h-fit w-full bg-bolt-elements-background-depth-1 dark:bg-black text-gray-900 dark:text-gray-200">
         <BackgroundRays />
         <Header />
         <ClientOnly>{() => <Menu />}</ClientOnly>
@@ -152,10 +152,10 @@ function ProblemsPage() {
                   className="p-4 rounded-lg bg-bolt-elements-background-depth-2 hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
                 >
                   <h2 className="text-xl font-semibold mb-2">{problem.title}</h2>
-                  <p className="text-gray-700 mb-2">{problem.description}</p>
+                  <p className="text-gray-700 dark:text-gray-200 mb-2">{problem.description}</p>
                   <Status status={problem.status} />
                   <Keywords keywords={problem.keywords} />
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-200">
                     Time: {new Date(problem.timestamp).toLocaleString()}
                   </p>
                 </a>
