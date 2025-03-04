@@ -11,8 +11,8 @@ function AboutPage() {
         <BackgroundRays />
         <Header />
         <ClientOnly>{() => <Menu />}</ClientOnly>
-        <div className="max-w-3xl mx-auto px-6 py-12 prose prose-invert">
-          <h1 className="text-4xl font-bold mb-8">About Nut</h1>
+        <div className="max-w-3xl mx-auto px-6 py-12 prose dark:text-gray-200 prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-a:text-bolt-elements-accent">
+          <h1 className="text-4xl font-bold mb-8 text-gray-900 dark:text-gray-200">About Nut</h1>
 
           <p className="mb-6">
             Nut is an{' '}
@@ -54,9 +54,9 @@ function AboutPage() {
           </p>
 
           <p className="mb-6">
-            Nut.new is already pretty good at fixing problems, and we’re working to make it better.
-            We want it to reliably fix anything you’re seeing, as long as it has a clear explanation
-            and the problem isn’t too complicated (AIs aren’t magic).  If it’s doing poorly, let us know!
+            Nut.new is already pretty good at fixing problems, and we're working to make it better.
+            We want it to reliably fix anything you're seeing, as long as it has a clear explanation
+            and the problem isn't too complicated (AIs aren't magic).  If it's doing poorly, let us know!
             Use the UI to leave us some private feedback or save your project to our public set of problems
             where AIs struggle.
           </p>
