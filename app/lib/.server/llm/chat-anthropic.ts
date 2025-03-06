@@ -58,13 +58,18 @@ export interface AnthropicCall {
 }
 
 function maybeParseAnthropicErrorPromptTooLong(e: any) {
-  if (e?.error?.type === "invalid_request_error") {
-    const match = /prompt is too long: (\d+) tokens > (\d+) maximum/.exec(e?.error?.message);
-    if (match) {
-      const tokens = +match[1];
-      const maximum = +match[2];
-      return { tokens, maximum };
+  try {
+    const { type, message } = e.error.error;
+    if (type === "invalid_request_error") {
+      const match = /prompt is too long: (\d+) tokens > (\d+) maximum/.exec(message);
+      if (match) {
+        const tokens = +match[1];
+        const maximum = +match[2];
+        return { tokens, maximum };
+      }
     }
+  } catch (e) {
+    console.log("AnthropicParseError", e);
   }
   return undefined;
 }
