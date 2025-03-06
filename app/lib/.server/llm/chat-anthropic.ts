@@ -6,6 +6,7 @@ import type { FileMap } from './stream-text';
 import { StreamingMessageParser } from '~/lib/runtime/message-parser';
 import { extractRelativePath } from '~/utils/diff';
 import { wrapWithSpan, getCurrentSpan } from '~/lib/.server/otel-wrapper';
+import { assert } from '~/lib/replay/ReplayProtocolClient';
 
 const Model = 'claude-3-7-sonnet-20250219';
 const MaxMessageTokens = 8192;
@@ -84,14 +85,12 @@ async function countTokens(state: ChatState, messages: MessageParam[], systemPro
   return response.input_tokens;
 }
 
-// How much we compress messages at a time.
-const CompressionFactor = 0.9;
-
-function compressMessageText(text: string): string {
-  return text.slice(text.length - Math.round(text.length * CompressionFactor));
+function compressMessageText(text: string, factor: number): string {
+  assert(factor > 0 && factor <= 1, `Invalid compression factor: ${factor}`);
+  return text.slice(text.length - Math.round(text.length * factor));
 }
 
-function compressMessage(msg: MessageParam): MessageParam {
+function compressMessage(msg: MessageParam, factor: number): MessageParam {
   // Only compress assistant messages.
   if (msg.role != "assistant") {
     return msg;
@@ -99,12 +98,12 @@ function compressMessage(msg: MessageParam): MessageParam {
 
   const newMessage = { ...msg };
   if (typeof newMessage.content === "string") {
-    newMessage.content = compressMessageText(newMessage.content);
+    newMessage.content = compressMessageText(newMessage.content, factor);
   } else if (Array.isArray(newMessage.content)) {
     newMessage.content = newMessage.content.map(block => {
       const newBlock = { ...block };
       if (newBlock.type === "text") {
-        newBlock.text = compressMessageText(newBlock.text);
+        newBlock.text = compressMessageText(newBlock.text, factor);
       }
       return newBlock;
     });
@@ -112,10 +111,10 @@ function compressMessage(msg: MessageParam): MessageParam {
   return newMessage;
 }
 
-function compressMessages(messages: MessageParam[]): MessageParam[] {
+function compressMessages(messages: MessageParam[], factor: number): MessageParam[] {
   const compressed = [];
   for (const msg of messages) {
-    compressed.push(compressMessage(msg));
+    compressed.push(compressMessage(msg, factor));
   }
   return compressed;
 }
@@ -130,9 +129,11 @@ async function reduceMessageSize(state: ChatState, messages: MessageParam[], sys
     if (tokens <= maximum) {
       return messages;
     }
-    
+
+    const factor = (maximum / tokens) * 0.9;
+
     // Compress messages to roughly target size
-    messages = compressMessages(messages);
+    messages = compressMessages(messages, factor);
   }
   throw new Error("Message compression failed");
 }
