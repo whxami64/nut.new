@@ -74,8 +74,8 @@ function maybeParseAnthropicErrorPromptTooLong(e: any) {
   return undefined;
 }
 
-async function countTokens(messages: MessageParam[], systemPrompt: string): Promise<number> {
-  const anthropic = new Anthropic();
+async function countTokens(state: ChatState, messages: MessageParam[], systemPrompt: string): Promise<number> {
+  const anthropic = new Anthropic({ apiKey: state.apiKey });
   const response = await anthropic.messages.countTokens({
     model: Model,
     messages,
@@ -122,7 +122,7 @@ function compressMessages(messages: MessageParam[]): MessageParam[] {
 
 async function reduceMessageSize(state: ChatState, messages: MessageParam[], systemPrompt: string, maximum: number): Promise<MessageParam[]> {
   for (let iteration = 0; iteration < 5; iteration++) {
-    const tokens = await countTokens(messages, systemPrompt);
+    const tokens = await countTokens(state, messages, systemPrompt);
 
     console.log(`AnthropicReduceMessageSize ${JSON.stringify({ iteration, tokens, maximum })}`);
     state.infos.push(`AnthropicReduceMessageSize ${JSON.stringify({ iteration, tokens, maximum })}`);
