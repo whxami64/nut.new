@@ -40,10 +40,13 @@ function convertContentToAnthropic(content: any): ContentBlockParam[] {
   return [];
 }
 
-export interface AnthropicApiKey {
-  key: string;
+export interface ChatState {
+  apiKey: string;
   isUser: boolean;
   userLoginKey?: string;
+
+  // Info about how the chat was processed which will be conveyed back to the client.
+  infos: string[];
 }
 
 export interface AnthropicCall {
@@ -112,9 +115,13 @@ function compressMessages(messages: MessageParam[]): MessageParam[] {
   return compressed;
 }
 
-async function reduceMessageSize(messages: MessageParam[], systemPrompt: string, maximum: number): Promise<MessageParam[]> {
-  for (let i = 0; i < 5; i++) {
+async function reduceMessageSize(state: ChatState, messages: MessageParam[], systemPrompt: string, maximum: number): Promise<MessageParam[]> {
+  for (let iteration = 0; iteration < 5; iteration++) {
     const tokens = await countTokens(messages, systemPrompt);
+
+    console.log(`AnthropicReduceMessageSize ${JSON.stringify({ iteration, tokens, maximum })}`);
+    state.infos.push(`AnthropicReduceMessageSize ${JSON.stringify({ iteration, tokens, maximum })}`);
+
     if (tokens <= maximum) {
       return messages;
     }
@@ -125,8 +132,8 @@ async function reduceMessageSize(messages: MessageParam[], systemPrompt: string,
   throw new Error("Message compression failed");
 }
 
-async function callAnthropicRaw(apiKey: string, systemPrompt: string, messages: MessageParam[]): Promise<Anthropic.Messages.Message> {
-  const anthropic = new Anthropic({ apiKey });
+async function callAnthropicRaw(state: ChatState, systemPrompt: string, messages: MessageParam[]): Promise<Anthropic.Messages.Message> {
+  const anthropic = new Anthropic({ apiKey: state.apiKey });
 
   try {
     return await anthropic.messages.create({
@@ -137,14 +144,24 @@ async function callAnthropicRaw(apiKey: string, systemPrompt: string, messages: 
     });
   } catch (e: any) {
     console.error("AnthropicError", e);
-    console.log("AnthropicErrorMessages", JSON.stringify({ systemPrompt, messages }, null, 2));
+    state.infos.push(`AnthropicError: ${e}`);
+
+    try {
+      console.log(`AnthropicErrorData ${JSON.stringify(e.error)}`);
+      state.infos.push(`AnthropicErrorData ${JSON.stringify(e.error)}`);
+    } catch (e) {
+      console.log(`AnthropicErrorDataException ${e}`);
+      state.infos.push(`AnthropicErrorDataException ${e}`);
+    }
+
+    state.infos.push(`AnthropicErrorMessages ${JSON.stringify({ systemPrompt, messages })}`);
 
     const info = maybeParseAnthropicErrorPromptTooLong(e);
     if (info) {
       const { maximum } = info;
-      const newMessages = await reduceMessageSize(messages, systemPrompt, maximum);
+      const newMessages = await reduceMessageSize(state, messages, systemPrompt, maximum);
 
-      console.log("AnthropicCompressedMessages", JSON.stringify({ systemPrompt, newMessages }, null, 2));
+      state.infos.push(`AnthropicCompressedMessages ${JSON.stringify({ systemPrompt, newMessages })}`);
 
       return await anthropic.messages.create({
         model: Model,
@@ -167,19 +184,19 @@ export const callAnthropic = wrapWithSpan(
   },
 
   // eslint-disable-next-line prefer-arrow-callback
-  async function callAnthropic(apiKey: AnthropicApiKey, reason: string, systemPrompt: string, messages: MessageParam[]): Promise<AnthropicCall> {
+  async function callAnthropic(state: ChatState, reason: string, systemPrompt: string, messages: MessageParam[]): Promise<AnthropicCall> {
     const span = getCurrentSpan();
     span?.setAttributes({
       "llm.chat.calls": 1, // so we can SUM(llm.chat.calls) without doing a COUNT + filter
       "llm.chat.num_messages": messages.length,
       "llm.chat.reason": reason,
-      "llm.chat.is_user_api_key": apiKey.isUser,
-      "llm.chat.user_login_key": apiKey.userLoginKey,
+      "llm.chat.is_user_api_key": state.isUser,
+      "llm.chat.user_login_key": state.userLoginKey,
     });
 
     console.log("AnthropicMessageSend");
 
-    const response = await callAnthropicRaw(apiKey.key, systemPrompt, messages);
+    const response = await callAnthropicRaw(state, systemPrompt, messages);
 
     let responseText = "";
     for (const content of response.content) {
@@ -228,16 +245,10 @@ function shouldRestorePartialFile(existingContent: string, newContent: string): 
   return existingContent.length > newContent.length;
 }
 
-interface ChatState {
-  // Info about how the chat was processed which will be conveyed back to the client.
-  infos: string[];
-}
-
 async function restorePartialFile(
   state: ChatState,
   existingContent: string,
   newContent: string,
-  cx: AnthropicApiKey,
   responseDescription: string
 ) {
   const systemPrompt = `
@@ -287,7 +298,7 @@ ${responseDescription}
     },
   ];
 
-  const restoreCall = await callAnthropic(cx, "RestorePartialFile", systemPrompt, messages);
+  const restoreCall = await callAnthropic(state, "RestorePartialFile", systemPrompt, messages);
 
   const OpenTag = "<restoredContent>";
   const CloseTag = "</restoredContent>";
@@ -396,7 +407,7 @@ interface FileContents {
   content: string;
 }
 
-async function fixupResponseFiles(state: ChatState, files: FileMap, cx: AnthropicApiKey, responseText: string) {
+async function fixupResponseFiles(state: ChatState, files: FileMap, responseText: string) {
   const fileContents: FileContents[] = [];
 
   const messageParser = new StreamingMessageParser({
@@ -425,7 +436,6 @@ async function fixupResponseFiles(state: ChatState, files: FileMap, cx: Anthropi
         state,
         existingContent,
         newContent,
-        cx,
         responseDescription
       );
       restoreCalls.push(restoreCall);
@@ -447,7 +457,7 @@ export type ChatAnthropicInfo = {
   infos: string[];
 }
 
-export async function chatAnthropic(chatController: ChatStreamController, files: FileMap, apiKey: AnthropicApiKey, systemPrompt: string, messages: CoreMessage[]) {
+export async function chatAnthropic(state: ChatState, chatController: ChatStreamController, files: FileMap, systemPrompt: string, messages: CoreMessage[]) {
   const messageParams: MessageParam[] = [];
 
   for (const message of messages) {
@@ -459,13 +469,9 @@ export async function chatAnthropic(chatController: ChatStreamController, files:
     });
   }
 
-  const mainCall = await callAnthropic(apiKey, "SendChatMessage", systemPrompt, messageParams);
+  const mainCall = await callAnthropic(state, "SendChatMessage", systemPrompt, messageParams);
 
-  const state: ChatState = {
-    infos: [],
-  };
-
-  const { responseText, restoreCalls } = await fixupResponseFiles(state, files, apiKey, mainCall.responseText);
+  const { responseText, restoreCalls } = await fixupResponseFiles(state, files, mainCall.responseText);
 
   chatController.writeText(responseText);
 

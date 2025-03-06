@@ -1,6 +1,6 @@
 import { json, type ActionFunctionArgs } from '@remix-run/cloudflare';
 
-import { callAnthropic, type AnthropicApiKey } from '~/lib/.server/llm/chat-anthropic';
+import { callAnthropic, type ChatState } from '~/lib/.server/llm/chat-anthropic';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages/messages.mjs';
 
 export async function action(args: ActionFunctionArgs) {
@@ -17,10 +17,10 @@ async function useSimulationAction({ context, request }: ActionFunctionArgs) {
     throw new Error("Anthropic API key is not set");
   }
 
-  const anthropicApiKey: AnthropicApiKey = {
-    key: apiKey,
+  const chatState: ChatState = {
+    apiKey,
     isUser: false,
-    userLoginKey: undefined,
+    infos: [],
   };
 
   const systemPrompt = `
@@ -40,7 +40,7 @@ reasoning and then respond with either \`<analyze>true</analyze>\` or \`<analyze
     content: `Here is the user message you need to evaluate: <user_message>${messageInput}</user_message>`,
   };
 
-  const { responseText } = await callAnthropic(anthropicApiKey, "UseSimulation", systemPrompt, [message]);
+  const { responseText } = await callAnthropic(chatState, "UseSimulation", systemPrompt, [message]);
 
   console.log("UseSimulationResponse", responseText);
 

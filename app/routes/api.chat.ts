@@ -2,7 +2,7 @@ import { type ActionFunctionArgs } from '@remix-run/cloudflare';
 import { ChatStreamController } from '~/utils/chatStreamController';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
 import { getStreamTextArguments, type FileMap, type Messages } from '~/lib/.server/llm/stream-text';
-import { chatAnthropic, type AnthropicApiKey } from '~/lib/.server/llm/chat-anthropic';
+import { chatAnthropic, type ChatState } from '~/lib/.server/llm/chat-anthropic';
 import { ensureOpenTelemetryInitialized } from '~/lib/.server/otel-wrapper';
 
 export async function action(args: ActionFunctionArgs) {
@@ -47,10 +47,11 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
       throw new Error("Anthropic API key is not set");
     }
 
-    const anthropicApiKey: AnthropicApiKey = {
-      key: apiKey,
+    const chatState: ChatState = {
+      apiKey,
       isUser: !!clientAnthropicApiKey,
       userLoginKey: loginKey,
+      infos: [],
     };
 
     const resultStream = new ReadableStream({
@@ -67,7 +68,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         }
 
         try {
-          await chatAnthropic(chatController, files, anthropicApiKey, system, coreMessages);
+          await chatAnthropic(chatState, chatController, files, system, coreMessages);
         } catch (e) {
           console.error(e);
           chatController.writeText(`Error chatting with Anthropic: ${e}`);
