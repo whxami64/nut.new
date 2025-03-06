@@ -2,7 +2,6 @@ import type { Message } from 'ai';
 
 export async function shouldUseSimulation(messages: Message[], messageInput: string) {
   const requestBody: any = {
-    messages,
     messageInput,
   };
 

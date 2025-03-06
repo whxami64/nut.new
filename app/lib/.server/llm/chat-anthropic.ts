@@ -54,6 +54,109 @@ export interface AnthropicCall {
   promptTokens: number;
 }
 
+function maybeParseAnthropicErrorPromptTooLong(e: any) {
+  if (e?.error?.type === "invalid_request_error") {
+    const match = /prompt is too long: (\d+) tokens > (\d+) maximum/.exec(e?.error?.message);
+    if (match) {
+      const tokens = +match[1];
+      const maximum = +match[2];
+      return { tokens, maximum };
+    }
+  }
+  return undefined;
+}
+
+async function countTokens(messages: MessageParam[], systemPrompt: string): Promise<number> {
+  const anthropic = new Anthropic();
+  const response = await anthropic.messages.countTokens({
+    model: Model,
+    messages,
+    system: systemPrompt,
+  });
+  return response.input_tokens;
+}
+
+// How much we compress messages at a time.
+const CompressionFactor = 0.9;
+
+function compressMessageText(text: string): string {
+  return text.slice(text.length - Math.round(text.length * CompressionFactor));
+}
+
+function compressMessage(msg: MessageParam): MessageParam {
+  // Only compress assistant messages.
+  if (msg.role != "assistant") {
+    return msg;
+  }
+
+  const newMessage = { ...msg };
+  if (typeof newMessage.content === "string") {
+    newMessage.content = compressMessageText(newMessage.content);
+  } else if (Array.isArray(newMessage.content)) {
+    newMessage.content = newMessage.content.map(block => {
+      const newBlock = { ...block };
+      if (newBlock.type === "text") {
+        newBlock.text = compressMessageText(newBlock.text);
+      }
+      return newBlock;
+    });
+  }
+  return newMessage;
+}
+
+function compressMessages(messages: MessageParam[]): MessageParam[] {
+  const compressed = [];
+  for (const msg of messages) {
+    compressed.push(compressMessage(msg));
+  }
+  return compressed;
+}
+
+async function reduceMessageSize(messages: MessageParam[], systemPrompt: string, maximum: number): Promise<MessageParam[]> {
+  for (let i = 0; i < 5; i++) {
+    const tokens = await countTokens(messages, systemPrompt);
+    if (tokens <= maximum) {
+      return messages;
+    }
+    
+    // Compress messages to roughly target size
+    messages = compressMessages(messages);
+  }
+  throw new Error("Message compression failed");
+}
+
+async function callAnthropicRaw(apiKey: string, systemPrompt: string, messages: MessageParam[]): Promise<Anthropic.Messages.Message> {
+  const anthropic = new Anthropic({ apiKey });
+
+  try {
+    return await anthropic.messages.create({
+      model: Model,
+      messages,
+      max_tokens: MaxMessageTokens,
+      system: systemPrompt,
+    });
+  } catch (e: any) {
+    console.error("AnthropicError", e);
+    console.log("AnthropicErrorMessages", JSON.stringify({ systemPrompt, messages }, null, 2));
+
+    const info = maybeParseAnthropicErrorPromptTooLong(e);
+    if (info) {
+      const { maximum } = info;
+      const newMessages = await reduceMessageSize(messages, systemPrompt, maximum);
+
+      console.log("AnthropicCompressedMessages", JSON.stringify({ systemPrompt, newMessages }, null, 2));
+
+      return await anthropic.messages.create({
+        model: Model,
+        messages: newMessages,
+        max_tokens: MaxMessageTokens,
+        system: systemPrompt,
+      });
+    }
+    throw e;
+  }
+}
+
 export const callAnthropic = wrapWithSpan(
   {
     name: "llm-call",
@@ -74,16 +177,9 @@ export const callAnthropic = wrapWithSpan(
       "llm.chat.user_login_key": apiKey.userLoginKey,
     });
 
-    const anthropic = new Anthropic({ apiKey: apiKey.key });
-
     console.log("AnthropicMessageSend");
 
-    const response = await anthropic.messages.create({
-      model: Model,
-      messages,
-      max_tokens: MaxMessageTokens,
-      system: systemPrompt,
-    });
+    const response = await callAnthropicRaw(apiKey.key, systemPrompt, messages);
 
     let responseText = "";
     for (const content of response.content) {
@@ -104,7 +200,6 @@ export const callAnthropic = wrapWithSpan(
       // to save us needing to worry about a derived column
       "llm.chat.total_tokens": completionTokens + promptTokens,
     });
-
 
     console.log("AnthropicMessageResponse");
 

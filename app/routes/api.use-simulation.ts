@@ -8,8 +8,7 @@ export async function action(args: ActionFunctionArgs) {
 }
 
 async function useSimulationAction({ context, request }: ActionFunctionArgs) {
-  const { messages, messageInput } = await request.json<{
-    messages: Message[];
+  const { messageInput } = await request.json<{
     messageInput: string;
   }>();
 
