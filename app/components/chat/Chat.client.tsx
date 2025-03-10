@@ -4,11 +4,10 @@
  */
 import { useStore } from '@nanostores/react';
 import type { CreateMessage, Message } from 'ai';
-import { useChat } from 'ai/react';
 import { useAnimate } from 'framer-motion';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cssTransition, toast, ToastContainer } from 'react-toastify';
-import { useMessageParser, usePromptEnhancer, useShortcuts, useSnapScroll } from '~/lib/hooks';
+import { useMessageParser, useShortcuts, useSnapScroll } from '~/lib/hooks';
 import { description, useChatHistory } from '~/lib/persistence';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -22,7 +21,7 @@ import { useSettings } from '~/lib/hooks/useSettings';
 import { useSearchParams } from '@remix-run/react';
 import { createSampler } from '~/utils/sampler';
 import { saveProjectContents } from './Messages.client';
-import { getSimulationRecording, getSimulationEnhancedPrompt, simulationAddData, simulationRepositoryUpdated } from '~/lib/replay/SimulationPrompt';
+import { getSimulationRecording, getSimulationEnhancedPrompt, simulationAddData, simulationRepositoryUpdated, shouldUseSimulation, sendDeveloperChatMessage, type ProtocolMessage } from '~/lib/replay/SimulationPrompt';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '../workbench/Preview';
 import { getCurrentMouseData } from '../workbench/PointSelector';
@@ -30,9 +29,9 @@ import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses 
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
 import { getNutLoginKey, submitFeedback } from '~/lib/replay/Problems';
-import { shouldUseSimulation } from '~/lib/hooks/useSimulation';
 import { ChatMessageTelemetry, pingTelemetry } from '~/lib/hooks/pingTelemetry';
 import type { RejectChangeData } from './ApproveChange';
+import { assert, generateRandomId } from '~/lib/replay/ReplayProtocolClient';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -40,17 +39,6 @@ const toastAnimation = cssTransition({
 });
 
 const logger = createScopedLogger('Chat');
-
-// Debounce things after file writes to avoid creating a bunch of chats.
-let gResetChatFileWrittenTimeout: NodeJS.Timeout | undefined;
-
-export function resetChatFileWritten() {
-  clearTimeout(gResetChatFileWrittenTimeout);
-  gResetChatFileWrittenTimeout = setTimeout(async () => {
-    const { contentBase64 } = await workbenchStore.generateZipBase64();
-    await simulationRepositoryUpdated(contentBase64);
-  }, 500);
-}
 
 let gLastProjectContents: string | undefined;
 
@@ -166,17 +154,33 @@ interface ChatProps {
 
 let gNumAborts = 0;
 
-function filterFiles(files: FileMap): FileMap {
-  const rv: FileMap = {};
-  for (const [path, file] of Object.entries(files)) {
-    if (shouldIncludeFile(path)) {
-      rv[path] = file;
-    }
+let gActiveChatMessageTelemetry: ChatMessageTelemetry | undefined;
+
+// When files are modified during a chat message we wait until the message finishes
+// before updating the simulation.
+let gUpdateSimulationAfterChatMessage = false;
+
+async function clearActiveChat() {
+  gActiveChatMessageTelemetry = undefined;
+  if (gUpdateSimulationAfterChatMessage) {
+    const { contentBase64 } = await workbenchStore.generateZipBase64();
+    await simulationRepositoryUpdated(contentBase64);
+    gUpdateSimulationAfterChatMessage = false;
   }
-  return rv;
 }
 
-let gActiveChatMessageTelemetry: ChatMessageTelemetry | undefined;
+export async function onRepositoryFileWritten() {
+  if (gActiveChatMessageTelemetry) {
+    gUpdateSimulationAfterChatMessage = true;
+  } else {
+    const { contentBase64 } = await workbenchStore.generateZipBase64();
+    await simulationRepositoryUpdated(contentBase64);
+  }
+}
+
+function buildMessageId(prefix: string, chatId: string) {
+  return `${prefix}-${chatId}`;
+}
 
 export const ChatImpl = memo(
   ({ description, initialMessages, storeMessageHistory, importChat, exportChat }: ChatProps) => {
@@ -187,57 +191,32 @@ export const ChatImpl = memo(
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]); // Move here
     const [imageDataList, setImageDataList] = useState<string[]>([]); // Move here
     const [searchParams, setSearchParams] = useSearchParams();
-    const [simulationLoading, setSimulationLoading] = useState(false);
     const files = useStore(workbenchStore.files);
-    const { promptId } = useSettings();
     const [approveChangesMessageId, setApproveChangesMessageId] = useState<string | undefined>(undefined);
+
+    // Input currently in the textarea.
+    const [input, setInput] = useState('');
+
+    // This is set when the user has triggered a chat message and the response hasn't finished
+    // being generated.
+    const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
+    const isLoading = activeChatId !== undefined;
+
+    const [messages, setMessages] = useState<Message[]>(initialMessages);
 
     const { showChat } = useStore(chatStore);
 
     const [animationScope, animate] = useAnimate();
-
-    const { messages, isLoading, input, handleInputChange, setInput, stop, append, setMessages } = useChat({
-      api: '/api/chat',
-      body: {
-        files: filterFiles(files),
-        promptId,
-      },
-      sendExtraMessageFields: true,
-      onError: (error) => {
-        logger.error('Request failed\n\n', error);
-        toast.error(
-          'There was an error processing your request: ' + (error.message ? error.message : 'No details were returned'),
-        );
-      },
-      initialMessages,
-      initialInput: Cookies.get(PROMPT_COOKIE_KEY) || '',
-    });
-
-    // Once we are no longer loading the message is complete.
-    if (gActiveChatMessageTelemetry && !isLoading && !simulationLoading) {
-      gActiveChatMessageTelemetry.finish();
-      gActiveChatMessageTelemetry = undefined;
-    }
 
     useEffect(() => {
       const prompt = searchParams.get('prompt');
 
       if (prompt) {
         setSearchParams({});
-        runAnimation();
-        append({
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: prompt,
-            },
-          ] as any, // Type assertion to bypass compiler check
-        });
+        sendMessage(prompt);
       }
     }, [searchParams]);
 
-    const { enhancingPrompt, promptEnhanced, enhancePrompt, resetEnhancer } = usePromptEnhancer();
     const { parsedMessages, setParsedMessages, parseMessages } = useMessageParser();
 
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
@@ -256,24 +235,16 @@ export const ChatImpl = memo(
       });
     }, [messages, isLoading, parseMessages]);
 
-    const scrollTextArea = () => {
-      const textarea = textareaRef.current;
-
-      if (textarea) {
-        textarea.scrollTop = textarea.scrollHeight;
-      }
-    };
-
     const abort = () => {
       stop();
       gNumAborts++;
       chatStore.setKey('aborted', true);
       workbenchStore.abortAllActions();
-      setSimulationLoading(false);
+      setActiveChatId(undefined);
 
       if (gActiveChatMessageTelemetry) {
         gActiveChatMessageTelemetry.abort("StopButtonClicked");
-        gActiveChatMessageTelemetry = undefined;
+        clearActiveChat();
       }
     };
 
@@ -305,7 +276,7 @@ export const ChatImpl = memo(
       setChatStarted(true);
     };
 
-    const createRecording = async () => {
+    const createRecording = async (chatId: string) => {
       let recordingId, message;
       try {
         recordingId = await getSimulationRecording();
@@ -316,7 +287,7 @@ export const ChatImpl = memo(
       }
 
       const recordingMessage: Message = {
-        id: `create-recording-${messages.length}`,
+        id: buildMessageId("create-recording", chatId),
         role: 'assistant',
         content: message,
       };
@@ -324,7 +295,7 @@ export const ChatImpl = memo(
       return { recordingId, recordingMessage };
     };
 
-    const getEnhancedPrompt = async (userMessage: string) => {
+    const getEnhancedPrompt = async (chatId: string, userMessage: string) => {
       let enhancedPrompt, message, hadError = false;
       try {
         const mouseData = getCurrentMouseData();
@@ -337,7 +308,7 @@ export const ChatImpl = memo(
       }
 
       const enhancedPromptMessage: Message = {
-        id: `enhanced-prompt-${Math.random()}`,
+        id: buildMessageId("enhanced-prompt", chatId),
         role: 'assistant',
         content: message,
       };
@@ -365,14 +336,37 @@ export const ChatImpl = memo(
         if (numFreeUses >= MaxFreeUses) {
           toast.error('All free uses consumed. Please set a login key or Anthropic API key in the "User Info" settings.');
           gActiveChatMessageTelemetry.abort("NoFreeUses");
-          gActiveChatMessageTelemetry = undefined;
+          clearActiveChat();
           return;
         }
 
         Cookies.set(anthropicNumFreeUsesCookieName, (numFreeUses + 1).toString());
       }
 
-      setSimulationLoading(true);
+      const chatId = generateRandomId();
+      setActiveChatId(chatId);
+
+      const userMessage: Message = {
+        id: buildMessageId("user", chatId),
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: _input,
+          },
+          ...imageDataList.map((imageData) => ({
+            type: 'image',
+            image: imageData,
+          })),
+        ] as any, // Type assertion to bypass compiler check
+      };
+
+      let newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+
+      // Add file cleanup here
+      setUploadedFiles([]);
+      setImageDataList([]);
 
       /**
        * @note (delm) Usually saving files shouldn't take long but it may take longer if there
@@ -383,9 +377,12 @@ export const ChatImpl = memo(
        */
       await workbenchStore.saveAllFiles();
 
-      let simulationEnhancedPrompt: string | undefined;
-
-      const simulation = chatStarted && await shouldUseSimulation(messages, _input);
+      let simulation = false;
+      try {
+        simulation = chatStarted && await shouldUseSimulation(_input);
+      } catch (e) {
+        console.error("Error checking simulation", e);
+      }
 
       if (numAbortsAtStart != gNumAborts) {
         return;
@@ -401,8 +398,8 @@ export const ChatImpl = memo(
         try {
           await flushSimulationData();
 
-          const createRecordingPromise = createRecording();
-          const enhancedPromptPromise = getEnhancedPrompt(_input);
+          const createRecordingPromise = createRecording(chatId);
+          const enhancedPromptPromise = getEnhancedPrompt(chatId, _input);
 
           const { recordingId, recordingMessage } = await createRecordingPromise;
 
@@ -411,7 +408,8 @@ export const ChatImpl = memo(
           }
 
           console.log("RecordingMessage", recordingMessage);
-          setMessages([...messages, recordingMessage]);
+          newMessages = [...newMessages, recordingMessage];
+          setMessages(newMessages);
 
           if (recordingId) {
             const info = await enhancedPromptPromise;
@@ -420,10 +418,9 @@ export const ChatImpl = memo(
               return;
             }
 
-            simulationEnhancedPrompt = info.enhancedPrompt;
-
             console.log("EnhancedPromptMessage", info.enhancedPromptMessage);
-            setMessages([...messages, info.enhancedPromptMessage]);
+            newMessages = [...newMessages, info.enhancedPromptMessage];
+            setMessages(newMessages);
 
             simulationStatus = info.hadError ? "PromptError" : "Success";
           } else {
@@ -442,21 +439,47 @@ export const ChatImpl = memo(
 
       runAnimation();
 
-      setSimulationLoading(false);
+      gActiveChatMessageTelemetry.sendPrompt(simulationStatus);
 
-      append({
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: _input,
-          },
-          ...imageDataList.map((imageData) => ({
-            type: 'image',
-            image: imageData,
-          })),
-        ] as any, // Type assertion to bypass compiler check
-      }, { body: { simulationEnhancedPrompt, anthropicApiKey, loginKey } });
+      const responseMessageId = buildMessageId("response", chatId);
+      let responseMessageContent = "";
+      let hasResponseMessage = false;
+
+      const addResponseContent = (content: string) => {
+        responseMessageContent += content;
+
+        if (gNumAborts != numAbortsAtStart) {
+          return;
+        }
+
+        newMessages = [...newMessages];
+        if (hasResponseMessage) {
+          newMessages.pop();
+        }
+        newMessages.push({
+          id: responseMessageId,
+          role: 'assistant',
+          content: responseMessageContent,
+        });
+        setMessages(newMessages);
+        hasResponseMessage = true;
+      }
+
+      try {
+        await sendDeveloperChatMessage(newMessages, files, addResponseContent);
+      } catch (e) {
+        console.error("Error sending message", e);
+        addResponseContent("Error sending message.");
+      }
+
+      if (gNumAborts != numAbortsAtStart) {
+        return;
+      }
+
+      gActiveChatMessageTelemetry.finish();
+      clearActiveChat();
+
+      setActiveChatId(undefined);
 
       if (fileModifications !== undefined) {
         /**
@@ -469,25 +492,13 @@ export const ChatImpl = memo(
       setInput('');
       Cookies.remove(PROMPT_COOKIE_KEY);
 
-      // Add file cleanup here
-      setUploadedFiles([]);
-      setImageDataList([]);
-
-      resetEnhancer();
-
       textareaRef.current?.blur();
 
-      // The project contents are associated with the last message present when
-      // the user message is added.
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage) {
-        const { contentBase64 } = await workbenchStore.generateZipBase64();
-        saveProjectContents(lastMessage.id, { content: contentBase64 });
-        gLastProjectContents = contentBase64;
-        setApproveChangesMessageId(lastMessage.id);
-      }
-
-      gActiveChatMessageTelemetry.sendPrompt(simulationStatus);
+      // The project contents are associated with the response message.
+      const { contentBase64 } = await workbenchStore.generateZipBase64();
+      saveProjectContents(responseMessageId, { content: contentBase64 });
+      gLastProjectContents = contentBase64;
+      setApproveChangesMessageId(responseMessageId);
     };
 
     const onRewind = async (messageId: string, contents: string) => {
@@ -588,7 +599,7 @@ export const ChatImpl = memo(
      * @param event - The change event from the textarea.
      */
     const onTextareaChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      handleInputChange(event);
+      setInput(event.target.value);
     };
 
     /**
@@ -625,9 +636,7 @@ export const ChatImpl = memo(
         input={input}
         showChat={showChat}
         chatStarted={chatStarted}
-        isStreaming={isLoading || simulationLoading}
-        enhancingPrompt={enhancingPrompt}
-        promptEnhanced={promptEnhanced}
+        isStreaming={isLoading}
         sendMessage={sendMessage}
         messageRef={messageRef}
         scrollRef={scrollRef}
@@ -640,15 +649,6 @@ export const ChatImpl = memo(
         importChat={importChat}
         exportChat={exportChat}
         messages={chatMessages}
-        enhancePrompt={() => {
-          enhancePrompt(
-            input,
-            (input) => {
-              setInput(input);
-              scrollTextArea();
-            },
-          );
-        }}
         uploadedFiles={uploadedFiles}
         setUploadedFiles={setUploadedFiles}
         imageDataList={imageDataList}

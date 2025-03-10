@@ -4,8 +4,12 @@
 import type { Message } from 'ai';
 import type { SimulationData, SimulationPacket } from './SimulationData';
 import { SimulationDataVersion } from './SimulationData';
-import { assert, ProtocolClient } from './ReplayProtocolClient';
+import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient';
 import type { MouseData } from './Recording';
+import type { FileMap } from '../stores/files';
+import { shouldIncludeFile } from '~/utils/fileUtils';
+import { DeveloperSystemPrompt } from '../common/prompts/prompts';
+import { detectProjectCommands } from '~/utils/projectCommands';
 
 function createRepositoryContentsPacket(contents: string): SimulationPacket {
   return {
@@ -15,11 +19,35 @@ function createRepositoryContentsPacket(contents: string): SimulationPacket {
   };
 }
 
-export type ProtocolMessage = {
-  role: "user" | "assistant" | "system";
+type ProtocolMessageRole = "user" | "assistant" | "system";
+
+type ProtocolMessageText = {
   type: "text";
+  role: ProtocolMessageRole;
   content: string;
 };
+
+type ProtocolMessageImage = {
+  type: "image";
+  role: ProtocolMessageRole;
+  dataURL: string;
+};
+
+export type ProtocolMessage = ProtocolMessageText | ProtocolMessageImage;
+
+export type ProtocolFile = {
+  path: string;
+  content: string;
+  base64?: boolean;
+};
+
+type ChatResponsePartCallback = (response: string) => void;
+
+interface ChatMessageOptions {
+  chatOnly?: boolean;
+  developerFiles?: ProtocolFile[];
+  onResponsePart?: ChatResponsePartCallback;
+}
 
 class ChatManager {
   // Empty if this chat has been destroyed.
@@ -121,24 +149,62 @@ class ChatManager {
     return allData;
   }
 
-  async sendChatMessage(messages: ProtocolMessage[]) {
+  async sendChatMessage(messages: ProtocolMessage[], options?: ChatMessageOptions) {
     assert(this.client, "Chat has been destroyed");
 
+    const responseId = `response-${generateRandomId()}`;
+
     let response: string = "";
-    this.client.listenForMessage("Nut.chatResponsePart", ({ message }: { message: ProtocolMessage }) => {
-      console.log("ChatResponsePart", message);
-      response += message.content;
+    const removeResponseListener = this.client.listenForMessage("Nut.chatResponsePart", ({ responseId: eventResponseId, message }: { responseId: string, message: ProtocolMessage }) => {
+      if (responseId == eventResponseId) {
+        if (message.type == "text") {
+          response += message.content;
+          options?.onResponsePart?.(message.content);
+        }
+      }
     });
 
-    const responseId = "<response-id>";
+    const modifiedFiles: ProtocolFile[] = [];
+    const removeFileListener = this.client.listenForMessage("Nut.chatModifiedFile", ({ responseId: eventResponseId, file }: { responseId: string, file: ProtocolFile }) => {
+      if (responseId == eventResponseId) {
+        console.log("ChatModifiedFile", file);
+        modifiedFiles.push(file);
+
+        const content = `
+        <boltArtifact id="modified-file-${generateRandomId()}" title="File Changes">
+        <boltAction type="file" filePath="${file.path}">${file.content}</boltAction>
+        </boltArtifact>
+        `;
+
+        response += content;
+        options?.onResponsePart?.(content);
+      }
+    });
+
     const chatId = await this.chatIdPromise;
 
-    console.log("ChatSendMessage", new Date().toISOString(), chatId, JSON.stringify(messages));
+    console.log("ChatSendMessage", new Date().toISOString(), chatId, JSON.stringify({ messages, developerFiles: options?.developerFiles }));
 
     await this.client.sendCommand({
       method: "Nut.sendChatMessage",
-      params: { chatId, responseId, messages },
+      params: { chatId, responseId, messages, chatOnly: options?.chatOnly, developerFiles: options?.developerFiles },
     });
+
+    removeResponseListener();
+    removeFileListener();
+
+    if (modifiedFiles.length) {
+      const commands = await detectProjectCommands(modifiedFiles);
+
+      const content = `
+      <boltArtifact id="project-setup" title="Project Setup">
+      <boltAction type="shell">${commands.setupCommand}</boltAction>
+      </boltArtifact>
+      `;
+
+      response += content;
+      options?.onResponsePart?.(content);
+    }
 
     return response;
   }
@@ -208,7 +274,7 @@ export function getLastSimulationChatMessages(): ProtocolMessage[] | undefined {
   return gLastSimulationChatMessages;
 }
 
-const SystemPrompt = `
+const SimulationSystemPrompt = `
 The following user message describes a bug or other problem on the page which needs to be fixed.
 You must respond with a useful explanation that will help the user understand the source of the problem.
 Do not describe the specific fix needed.
@@ -222,7 +288,7 @@ export async function getSimulationEnhancedPrompt(
   assert(gChatManager, "Chat not started");
   assert(gChatManager.simulationFinished, "Simulation not finished");
 
-  let system = SystemPrompt;
+  let system = SimulationSystemPrompt;
   if (mouseData) {
     system += `The user pointed to an element on the page <element selector=${JSON.stringify(mouseData.selector)} height=${mouseData.height} width=${mouseData.width} x=${mouseData.x} y=${mouseData.y} />`;
   }
@@ -242,5 +308,145 @@ export async function getSimulationEnhancedPrompt(
 
   gLastSimulationChatMessages = messages;
 
-  return gChatManager.sendChatMessage(messages);
+  return await gChatManager.sendChatMessage(messages);
+}
+
+export async function shouldUseSimulation(messageInput: string) {
+  if (!gChatManager) {
+    gChatManager = new ChatManager();
+  }
+
+  const systemPrompt = `
+You are a helpful assistant that determines whether a user's message that is asking an AI
+to make a change to an application should first perform a detailed analysis of the application's
+behavior to generate a better answer.
+
+This is most helpful when the user is asking the AI to fix a problem with the application.
+When making straightforward improvements to the application a detailed analysis is not necessary.
+
+The text of the user's message will be wrapped in \`<user_message>\` tags. You must describe your
+reasoning and then respond with either \`<analyze>true</analyze>\` or \`<analyze>false</analyze>\`.
+  `;
+
+  const userMessage = `
+Here is the user message you need to evaluate: <user_message>${messageInput}</user_message>
+  `;
+
+  const messages: ProtocolMessage[] = [
+    {
+      role: "system",
+      type: "text",
+      content: systemPrompt,
+    },
+    {
+      role: "user",
+      type: "text",
+      content: userMessage,
+    },
+  ];
+
+  const response = await gChatManager.sendChatMessage(messages, { chatOnly: true });
+
+  console.log("UseSimulationResponse", response);
+
+  const match = /<analyze>(.*?)<\/analyze>/.exec(response);
+  if (match) {
+    return match[1] === "true";
+  }
+  return false;
+}
+
+function getProtocolRule(message: Message): "user" | "assistant" | "system" {
+  switch (message.role) {
+    case "user":
+      return "user";
+    case "assistant":
+    case "data":
+      return "assistant";
+    case "system":
+      return "system";
+  }
+}
+
+function removeBoltArtifacts(text: string): string {
+  const OpenTag = "<boltArtifact";
+  const CloseTag = "</boltArtifact>";
+
+  while (true) {
+    const openTag = text.indexOf(OpenTag);
+    if (openTag === -1) {
+      break;
+    }
+
+    const prefix = text.substring(0, openTag);
+
+    const closeTag = text.indexOf(CloseTag, openTag + OpenTag.length);
+    if (closeTag === -1) {
+      text = prefix;
+    } else {
+      text = prefix + text.substring(closeTag + CloseTag.length);
+    }
+  }
+  return text;
+}
+
+function buildProtocolMessages(messages: Message[]): ProtocolMessage[] {
+  const rv: ProtocolMessage[] = [];
+  for (const msg of messages) {
+    const role = getProtocolRule(msg);
+    if (Array.isArray(msg.content)) {
+      for (const content of msg.content) {
+        switch (content.type) {
+          case "text":
+            rv.push({
+              role,
+              type: "text",
+              content: removeBoltArtifacts(content.text),
+            });
+            break;
+          case "image":
+            rv.push({
+              role,
+              type: "image",
+              dataURL: content.image,
+            });
+            break;
+          default:
+            console.error("Unknown message content", content);
+        }
+      }
+    } else if (typeof msg.content == "string") {
+      rv.push({
+        role,
+        type: "text",
+        content: msg.content,
+      });
+    }
+  }
+  return rv;
+}
+
+export async function sendDeveloperChatMessage(messages: Message[], files: FileMap, onResponsePart: ChatResponsePartCallback) {
+  if (!gChatManager) {
+    gChatManager = new ChatManager();
+  }
+
+  const developerFiles: ProtocolFile[] = [];
+  for (const [path, file] of Object.entries(files)) {
+    if (file?.type == "file" && shouldIncludeFile(path)) {
+      developerFiles.push({
+        path,
+        content: file.content,
+      });
+    }
+  }
+
+  const protocolMessages = buildProtocolMessages(messages);
+  protocolMessages.unshift({
+    role: "system",
+    type: "text",
+    content: DeveloperSystemPrompt,
+  });
+
+  return gChatManager.sendChatMessage(protocolMessages, { chatOnly: true, developerFiles, onResponsePart });
 }
