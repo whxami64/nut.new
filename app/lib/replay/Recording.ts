@@ -198,6 +198,7 @@ function addRecordingMessageHandler(_messageHandlerId: string) {
         };
       }
     }
+    throw new Error(`Unknown request type: ${request}`);
   }
 
   window.addEventListener('message', async (event) => {

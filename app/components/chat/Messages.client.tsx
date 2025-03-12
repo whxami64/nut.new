@@ -80,7 +80,6 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>((props: 
               >
                 <Suspense
                   fallback={
-                    // TODO: this fallback could be improved
                     <div className="text-center w-full text-bolt-elements-textSecondary i-svg-spinners:3-dots-fade text-4xl mt-4"></div>
                   }
                 >

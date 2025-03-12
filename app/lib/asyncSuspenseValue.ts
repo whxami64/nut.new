@@ -45,6 +45,8 @@ export function createAsyncSuspenseValue<T>(getValue: () => Promise<T>) {
           return record.value;
         case 'rejected':
           throw record.error;
+        default:
+          throw new Error(`Unknown status: ${(record as any).status}`);
       }
     },
 
@@ -60,6 +62,8 @@ export function createAsyncSuspenseValue<T>(getValue: () => Promise<T>) {
           return record.value;
         case 'rejected':
           throw record.error;
+        default:
+          throw new Error(`Unknown status: ${(record as any).status}`);
       }
     },
     preload() {

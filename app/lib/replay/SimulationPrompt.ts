@@ -409,6 +409,8 @@ function getProtocolRule(message: Message): 'user' | 'assistant' | 'system' {
       return 'assistant';
     case 'system':
       return 'system';
+    default:
+      throw new Error(`Unknown message role: ${message.role}`);
   }
 }
 
