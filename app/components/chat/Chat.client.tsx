@@ -31,7 +31,7 @@ import {
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '~/components/workbench/Preview';
 import { getCurrentMouseData } from '~/components/workbench/PointSelector';
-import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
+import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, maxFreeUses } from '~/utils/freeUses';
 import { getNutLoginKey, submitFeedback } from '~/lib/replay/Problems';
 import { ChatMessageTelemetry, pingTelemetry } from '~/lib/hooks/pingTelemetry';
 import type { RejectChangeData } from './ApproveChange';
@@ -347,7 +347,7 @@ export const ChatImpl = memo(
       if (!loginKey && !anthropicApiKey) {
         const numFreeUses = +(Cookies.get(anthropicNumFreeUsesCookieName) || 0);
 
-        if (numFreeUses >= MaxFreeUses) {
+        if (numFreeUses >= maxFreeUses) {
           toast.error(
             'All free uses consumed. Please set a login key or Anthropic API key in the "User Info" settings.',
           );
