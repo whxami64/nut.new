@@ -13,21 +13,48 @@ interface LoadProblemButtonProps {
 }
 
 export function setLastLoadedProblem(problem: BoltProblem) {
+  const problemSerialized = JSON.stringify(problem);
+
   try {
-    localStorage.setItem('loadedProblem', JSON.stringify(problem));
-  } catch (error) {
-    console.error('Failed to set last loaded problem:', error);
+    localStorage.setItem('loadedProblemId', problem.problemId);
+    localStorage.setItem('loadedProblem', problemSerialized);
+  } catch (error: any) {
+    // Remove loadedProblem, so we don't accidentally associate a solution with the wrong problem.
+    localStorage.removeItem('loadedProblem');
+    console.error(
+      `Failed to set last loaded problem (size=${(problemSerialized.length / 1024).toFixed(2)}kb):`,
+      error.stack || error,
+    );
   }
 }
 
-export function getLastLoadedProblem(): BoltProblem | undefined {
+export async function getOrFetchLastLoadedProblem(): Promise<BoltProblem | null> {
   const problemJSON = localStorage.getItem('loadedProblem');
+  let problem: BoltProblem | null = null;
 
-  if (!problemJSON) {
-    return undefined;
+  if (problemJSON) {
+    problem = JSON.parse(problemJSON);
+  } else {
+    /*
+     * Problem might not have fit into localStorage.
+     * Try to re-load it from server.
+     */
+    const problemId = localStorage.getItem('loadedProblemId');
+
+    if (!problemId) {
+      return null;
+    }
+
+    problem = await getProblem(problemId);
+
+    if (!problem) {
+      return null;
+    }
+
+    setLastLoadedProblem(problem);
   }
 
-  return JSON.parse(problemJSON);
+  return problem;
 }
 
 export async function loadProblem(
