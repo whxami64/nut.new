@@ -71,7 +71,10 @@ export function createAsyncSuspenseValue<T>(getValue: () => Promise<T>) {
         return;
       }
 
-      load().catch(() => {});
+      load().catch((error) => {
+        // Errors are already handled by the load method, just swallow them here
+        console.error('Preload error:', error);
+      });
     },
   };
 

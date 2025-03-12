@@ -112,7 +112,9 @@ export const LoadProblemButton: React.FC<LoadProblemButtonProps> = ({ className,
           type="text"
           webkitdirectory=""
           directory=""
-          onChange={(_e) => {}}
+          onChange={(_e) => {
+            /* Input change handled by onKeyDown */
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               handleSubmit(e as any);
