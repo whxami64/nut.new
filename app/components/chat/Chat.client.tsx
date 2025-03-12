@@ -31,8 +31,8 @@ import {
   type ProtocolMessage,
 } from '~/lib/replay/SimulationPrompt';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
-import { getCurrentIFrame } from '../workbench/Preview';
-import { getCurrentMouseData } from '../workbench/PointSelector';
+import { getCurrentIFrame } from '~/components/workbench/Preview';
+import { getCurrentMouseData } from '~/components/workbench/PointSelector';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';

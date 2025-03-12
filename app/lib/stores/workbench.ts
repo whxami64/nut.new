@@ -17,9 +17,9 @@ import { extractRelativePath } from '~/utils/diff';
 import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
-import { uint8ArrayToBase64 } from '../replay/ReplayProtocolClient';
+import { uint8ArrayToBase64 } from '~/lib/replay/ReplayProtocolClient';
 import type { ActionAlert } from '~/types/actions';
-import { extractFileArtifactsFromRepositoryContents } from '../replay/Problems';
+import { extractFileArtifactsFromRepositoryContents } from '~/lib/replay/Problems';
 
 export interface ArtifactState {
   id: string;

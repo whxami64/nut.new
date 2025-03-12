@@ -1,7 +1,7 @@
 import { WebContainer } from '@webcontainer/api';
 import { WORK_DIR_NAME } from '~/utils/constants';
 import { cleanStackTrace } from '~/utils/stacktrace';
-import { recordingMessageHandlerScript } from '../replay/Recording';
+import { recordingMessageHandlerScript } from '~/lib/replay/Recording';
 
 interface WebContainerContext {
   loaded: boolean;
