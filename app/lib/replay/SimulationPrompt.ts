@@ -8,9 +8,9 @@ import type { SimulationData, SimulationPacket } from './SimulationData';
 import { SimulationDataVersion } from './SimulationData';
 import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient';
 import type { MouseData } from './Recording';
-import type { FileMap } from '../stores/files';
+import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
-import { DeveloperSystemPrompt } from '../common/prompts/prompts';
+import { DeveloperSystemPrompt } from '~/lib/common/prompts/prompts';
 import { detectProjectCommands } from '~/utils/projectCommands';
 
 function createRepositoryContentsPacket(contents: string): SimulationPacket {
@@ -83,6 +83,10 @@ class ChatManager {
 
       return chatId;
     })();
+  }
+
+  isValid() {
+    return !!this.client;
   }
 
   destroy() {
@@ -289,6 +293,17 @@ export async function getSimulationRecording(): Promise<string> {
 
   console.log('SimulationData', new Date().toISOString(), JSON.stringify(simulationData));
 
+  assert(gChatManager.recordingIdPromise, 'Expected recording promise');
+
+  return gChatManager.recordingIdPromise;
+}
+
+export function isSimulatingOrHasFinished(): boolean {
+  return gChatManager?.isValid() ?? false;
+}
+
+export async function getSimulationRecordingId(): Promise<string> {
+  assert(gChatManager, 'Chat not started');
   assert(gChatManager.recordingIdPromise, 'Expected recording promise');
 
   return gChatManager.recordingIdPromise;

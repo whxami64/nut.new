@@ -1,11 +1,15 @@
 import { toast } from 'react-toastify';
 import ReactModal from 'react-modal';
 import { useState } from 'react';
-import { workbenchStore } from '~/lib/stores/workbench';
 import { BoltProblemStatus, updateProblem } from '~/lib/replay/Problems';
-import type { BoltProblemInput } from '~/lib/replay/Problems';
-import { getLastLoadedProblem } from '../chat/LoadProblemButton';
-import { getLastUserSimulationData, getLastSimulationChatMessages } from '~/lib/replay/SimulationPrompt';
+import type { BoltProblem, BoltProblemInput } from '~/lib/replay/Problems';
+import { getOrFetchLastLoadedProblem } from '~/components/chat/LoadProblemButton';
+import {
+  getLastUserSimulationData,
+  getLastSimulationChatMessages,
+  getSimulationRecordingId,
+  isSimulatingOrHasFinished,
+} from '~/lib/replay/SimulationPrompt';
 
 ReactModal.setAppElement('#root');
 
@@ -20,13 +24,28 @@ export function SaveSolution() {
     evaluator: '',
   });
   const [savedSolution, setSavedSolution] = useState<boolean>(false);
+  const [problem, setProblem] = useState<BoltProblem | null>(null);
 
-  const handleSaveSolution = () => {
-    setIsModalOpen(true);
-    setFormData({
-      evaluator: '',
-    });
+  const handleSaveSolution = async () => {
+    const loadId = toast.loading('Loading problem...');
+
+    try {
+      const savedProblem = await getOrFetchLastLoadedProblem();
+
+      if (!savedProblem) {
+        toast.error('No problem loaded');
+        return;
+      }
+
+      setProblem(savedProblem);
+      setFormData({
+        evaluator: savedProblem.solution?.evaluator || '',
+      });
+    } finally {
+      toast.dismiss(loadId);
+    }
     setSavedSolution(false);
+    setIsModalOpen(true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,55 +57,82 @@ export function SaveSolution() {
   };
 
   const handleSubmitSolution = async () => {
-    const savedProblem = getLastLoadedProblem();
-
-    if (!savedProblem) {
+    if (!problem) {
       toast.error('No problem loaded');
       return;
     }
 
-    const simulationData = getLastUserSimulationData();
-
-    if (!simulationData) {
-      toast.error('No simulation data found');
+    if (!isSimulatingOrHasFinished()) {
+      toast.error('No simulation found (neither in progress nor finished)');
       return;
     }
 
-    const messages = getLastSimulationChatMessages();
+    try {
+      const loadId = toast.loading('Waiting for recording...');
 
-    if (!messages) {
-      toast.error('No user prompt found');
-      return;
+      try {
+        /*
+         * Wait for simulation to finish.
+         * const recordingId =
+         */
+        await getSimulationRecordingId();
+      } finally {
+        toast.dismiss(loadId);
+      }
+
+      toast.info('Submitting solution...');
+
+      console.log('SubmitSolution', formData);
+
+      const simulationData = getLastUserSimulationData();
+
+      if (!simulationData) {
+        toast.error('No simulation data found');
+        return;
+      }
+
+      const messages = getLastSimulationChatMessages();
+
+      if (!messages) {
+        toast.error('No user prompt found');
+        return;
+      }
+
+      /*
+       * The evaluator is only present when the problem has been solved.
+       * We still create a "solution" object even if it hasn't been
+       * solved quite yet, which is used for working on the problem.
+       *
+       * TODO: Split `solution` into `reproData` and `evaluator`.
+       */
+      const evaluator = formData.evaluator.length ? formData.evaluator : undefined;
+
+      const problemUpdatePacket: BoltProblemInput = {
+        version: 2,
+        title: problem.title,
+        description: problem.description,
+        username: problem.username,
+        repositoryContents: problem.repositoryContents,
+        status: evaluator ? BoltProblemStatus.Solved : BoltProblemStatus.Unsolved,
+        solution: {
+          simulationData,
+          messages,
+          evaluator,
+
+          /*
+           * TODO: Also store recordingId for easier debugging.
+           * recordingId,
+           */
+        },
+      };
+
+      await updateProblem(problem.problemId, problemUpdatePacket);
+
+      setSavedSolution(true);
+    } catch (error: any) {
+      console.error('Error saving solution', error?.stack || error);
+      toast.error(`Error saving solution: ${error?.message}`);
     }
-
-    toast.info('Submitting solution...');
-
-    console.log('SubmitSolution', formData);
-
-    /*
-     * The evaluator is only present when the problem has been solved.
-     * We still create a "solution" object even if it hasn't been
-     * solved quite yet, which is used for working on the problem.
-     */
-    const evaluator = formData.evaluator.length ? formData.evaluator : undefined;
-
-    const problem: BoltProblemInput = {
-      version: 2,
-      title: savedProblem.title,
-      description: savedProblem.description,
-      username: savedProblem.username,
-      repositoryContents: savedProblem.repositoryContents,
-      status: evaluator ? BoltProblemStatus.Solved : BoltProblemStatus.Unsolved,
-      solution: {
-        simulationData,
-        messages,
-        evaluator,
-      },
-    };
-
-    await updateProblem(savedProblem.problemId, problem);
-
-    setSavedSolution(true);
   };
 
   return (
