@@ -43,7 +43,7 @@ export function stringToBase64(inputString: string) {
   return uint8ArrayToBase64(data);
 }
 
-function logDebug(msg: string, tags: Record<string, any> = {}) {
+function logDebug(msg: string, _tags: Record<string, any> = {}) {
   //console.log(msg, JSON.stringify(tags));
 }
 

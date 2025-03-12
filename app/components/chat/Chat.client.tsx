@@ -3,9 +3,9 @@
  * Preventing TS checks with files presented in the video for a better presentation.
  */
 import { useStore } from '@nanostores/react';
-import type { CreateMessage, Message } from 'ai';
+import type { Message } from 'ai';
 import { useAnimate } from 'framer-motion';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { cssTransition, toast, ToastContainer } from 'react-toastify';
 import { useMessageParser, useShortcuts, useSnapScroll } from '~/lib/hooks';
 import { description, useChatHistory } from '~/lib/persistence';
@@ -13,11 +13,10 @@ import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { PROMPT_COOKIE_KEY } from '~/utils/constants';
 import { cubicEasingFn } from '~/utils/easings';
-import { createScopedLogger, renderLogger } from '~/utils/logger';
+import { renderLogger } from '~/utils/logger';
 import { BaseChat } from './BaseChat';
 import Cookies from 'js-cookie';
 import { debounce } from '~/utils/debounce';
-import { useSettings } from '~/lib/hooks/useSettings';
 import { useSearchParams } from '@remix-run/react';
 import { createSampler } from '~/utils/sampler';
 import { saveProjectContents } from './Messages.client';
@@ -28,26 +27,20 @@ import {
   simulationRepositoryUpdated,
   shouldUseSimulation,
   sendDeveloperChatMessage,
-  type ProtocolMessage,
 } from '~/lib/replay/SimulationPrompt';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '~/components/workbench/Preview';
 import { getCurrentMouseData } from '~/components/workbench/PointSelector';
 import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, MaxFreeUses } from '~/utils/freeUses';
-import type { FileMap } from '~/lib/stores/files';
-import { shouldIncludeFile } from '~/utils/fileUtils';
 import { getNutLoginKey, submitFeedback } from '~/lib/replay/Problems';
 import { ChatMessageTelemetry, pingTelemetry } from '~/lib/hooks/pingTelemetry';
 import type { RejectChangeData } from './ApproveChange';
-import { assert, generateRandomId } from '~/lib/replay/ReplayProtocolClient';
+import { generateRandomId } from '~/lib/replay/ReplayProtocolClient';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
   exit: 'animated fadeOutRight',
 });
-
-const logger = createScopedLogger('Chat');
-
 let gLastProjectContents: string | undefined;
 
 export function getLastProjectContents() {

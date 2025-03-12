@@ -87,7 +87,7 @@ export async function getMouseData(iframe: HTMLIFrameElement, position: { x: num
 }
 
 // Add handlers to the current iframe's window.
-function addRecordingMessageHandler(messageHandlerId: string) {
+function addRecordingMessageHandler(_messageHandlerId: string) {
   const simulationData: SimulationData = [];
   let numSimulationPacketsSent = 0;
 
@@ -342,7 +342,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
     { capture: true, passive: true },
   );
 
-  function onInterceptedOperation(name: string) {
+  function onInterceptedOperation(_name: string) {
     //console.log(`InterceptedOperation ${name}`);
   }
 

@@ -11,8 +11,10 @@ export default function FeaturesTab() {
     enableEventLogs,
     isLatestBranch,
     enableLatestBranch,
-    promptId,
-    setPromptId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _promptId: promptId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _setPromptId: setPromptId,
     autoSelectTemplate,
     setAutoSelectTemplate,
     enableContextOptimization,

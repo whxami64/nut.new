@@ -309,6 +309,7 @@ export class StreamingMessageParser {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const createArtifactElement: ElementFactory = (props) => {
   const elementProps = [
     'class="__boltArtifact__"',

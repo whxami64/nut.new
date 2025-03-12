@@ -28,7 +28,7 @@ export async function action(args: ActionFunctionArgs) {
   return pingTelemetryAction(args);
 }
 
-async function pingTelemetryAction({ context, request }: ActionFunctionArgs) {
+async function pingTelemetryAction({ request }: ActionFunctionArgs) {
   const { event, data } = await request.json<{
     event: string;
     data: any;

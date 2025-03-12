@@ -31,7 +31,7 @@ export default function ConnectionsTab() {
     try {
       await saveNutLoginKey(key);
       toast.success('Login key saved');
-    } catch (error) {
+    } catch {
       toast.error('Failed to save login key');
     }
   };

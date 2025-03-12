@@ -11,8 +11,6 @@ import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
 import { getLastMessageProjectContents, hasFileModifications, Messages } from './Messages.client';
 import { SendButton } from './SendButton.client';
-import { APIKeyManager } from './APIKeyManager';
-import Cookies from 'js-cookie';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
 import styles from './BaseChat.module.scss';
@@ -22,10 +20,8 @@ import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import GitCloneButton from './GitCloneButton';
 
 import FilePreview from './FilePreview';
-import { ModelSelector } from '~/components/chat/ModelSelector';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 import { ScreenshotStateManager } from './ScreenshotStateManager';
-import { toast } from 'react-toastify';
 import type { RejectChangeData } from './ApproveChange';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
 import ApproveChange from './ApproveChange';
@@ -70,11 +66,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       chatStarted = false,
       isStreaming = false,
       input = '',
-      enhancingPrompt,
+      _enhancingPrompt,
       handleInputChange,
 
-      // promptEnhanced,
-      enhancePrompt,
+      _enhancePrompt,
       sendMessage,
       handleStop,
       importChat,

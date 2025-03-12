@@ -2,7 +2,7 @@ import type { Tracer } from '@opentelemetry/api';
 import { SpanStatusCode, type Attributes, context, trace } from '@opentelemetry/api';
 import type { ExportResult } from '@opentelemetry/core';
 import { ExportResultCode } from '@opentelemetry/core';
-import type { ExportServiceError, OTLPExporterConfigBase } from '@opentelemetry/otlp-exporter-base';
+import type { OTLPExporterConfigBase } from '@opentelemetry/otlp-exporter-base';
 import { OTLPExporterError } from '@opentelemetry/otlp-exporter-base';
 import { createExportTraceServiceRequest } from '@opentelemetry/otlp-transformer';
 import { Resource } from '@opentelemetry/resources';

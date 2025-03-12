@@ -93,7 +93,7 @@ export const LoadProblemButton: React.FC<LoadProblemButtonProps> = ({ className,
   const [isLoading, setIsLoading] = useState(false);
   const [isInputOpen, setIsInputOpen] = useState(false);
 
-  const handleSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSubmit = async (_e: React.ChangeEvent<HTMLInputElement>) => {
     setIsLoading(true);
     setIsInputOpen(false);
 
@@ -112,7 +112,7 @@ export const LoadProblemButton: React.FC<LoadProblemButtonProps> = ({ className,
           type="text"
           webkitdirectory=""
           directory=""
-          onChange={() => {}}
+          onChange={(_e) => {}}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               handleSubmit(e as any);

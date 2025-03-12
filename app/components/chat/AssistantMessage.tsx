@@ -1,8 +1,6 @@
 import { memo } from 'react';
 import { Markdown } from './Markdown';
 import type { JSONValue } from 'ai';
-import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages/messages.mjs';
-import { toast } from 'react-toastify';
 
 interface AssistantMessageProps {
   content: string;
