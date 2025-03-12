@@ -366,22 +366,22 @@ function addRecordingMessageHandler(messageHandlerId: string) {
     });
   }
 
-  const IDBFactoryMethods = {
+  const idbFactoryMethods = {
     _name: 'IDBFactory',
     open: (v: any) => createFunctionProxy(v, 'open'),
   };
 
-  const IDBOpenDBRequestMethods = {
+  const idbOpenDBRequestMethods = {
     _name: 'IDBOpenDBRequest',
     result: createProxy,
   };
 
-  const IDBDatabaseMethods = {
+  const idbDatabaseMethods = {
     _name: 'IDBDatabase',
     transaction: (v: any) => createFunctionProxy(v, 'transaction'),
   };
 
-  const IDBTransactionMethods = {
+  const idbTransactionMethods = {
     _name: 'IDBTransaction',
     objectStore: (v: any) => createFunctionProxy(v, 'objectStore'),
   };
@@ -400,7 +400,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
   // Map "get" requests to their keys.
   const getRequestKeys: Map<IDBRequest, any> = new Map();
 
-  const IDBObjectStoreMethods = {
+  const idbObjectStoreMethods = {
     _name: 'IDBObjectStore',
     get: (v: any) =>
       createFunctionProxy(v, 'get', (request, key) => {
@@ -420,7 +420,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
       }),
   };
 
-  const IDBRequestMethods = {
+  const idbRequestMethods = {
     _name: 'IDBRequest',
     result: (value: any, target: any) => {
       const key = getRequestKeys.get(target);
@@ -437,7 +437,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
     addLocalStorageAccess({ kind, key, value });
   }
 
-  const StorageMethods = {
+  const storageMethods = {
     _name: 'Storage',
     getItem: (v: any) =>
       createFunctionProxy(v, 'getItem', (value: string, key: string) => {
@@ -462,7 +462,7 @@ function addRecordingMessageHandler(messageHandlerId: string) {
     return result;
   }
 
-  const ResponseMethods = {
+  const responseMethods = {
     _name: 'Response',
     json: (v: any, response: Response) =>
       createFunctionProxy(v, 'json', async (promise: Promise<any>) => {
@@ -492,21 +492,21 @@ function addRecordingMessageHandler(messageHandlerId: string) {
     let methods;
 
     if (obj instanceof IDBFactory) {
-      methods = IDBFactoryMethods;
+      methods = idbFactoryMethods;
     } else if (obj instanceof IDBOpenDBRequest) {
-      methods = IDBOpenDBRequestMethods;
+      methods = idbOpenDBRequestMethods;
     } else if (obj instanceof IDBDatabase) {
-      methods = IDBDatabaseMethods;
+      methods = idbDatabaseMethods;
     } else if (obj instanceof IDBTransaction) {
-      methods = IDBTransactionMethods;
+      methods = idbTransactionMethods;
     } else if (obj instanceof IDBObjectStore) {
-      methods = IDBObjectStoreMethods;
+      methods = idbObjectStoreMethods;
     } else if (obj instanceof IDBRequest) {
-      methods = IDBRequestMethods;
+      methods = idbRequestMethods;
     } else if (obj instanceof Storage) {
-      methods = StorageMethods;
+      methods = storageMethods;
     } else if (obj instanceof Response) {
-      methods = ResponseMethods;
+      methods = responseMethods;
     }
 
     assert(methods, 'Unknown object for createProxy');

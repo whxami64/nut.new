@@ -5,12 +5,12 @@
 
 import type { Message } from 'ai';
 import type { SimulationData, SimulationPacket } from './SimulationData';
-import { SimulationDataVersion } from './SimulationData';
+import { simulationDataVersion } from './SimulationData';
 import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient';
 import type { MouseData } from './Recording';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
-import { DeveloperSystemPrompt } from '~/lib/common/prompts/prompts';
+import { developerSystemPrompt } from '~/lib/common/prompts/prompts';
 import { detectProjectCommands } from '~/utils/projectCommands';
 
 function createRepositoryContentsPacket(contents: string): SimulationPacket {
@@ -105,7 +105,7 @@ class ChatManager {
       method: 'Nut.addSimulation',
       params: {
         chatId,
-        version: SimulationDataVersion,
+        version: simulationDataVersion,
         simulationData: [packet],
         completeData: false,
         saveRecording: true,
@@ -315,7 +315,7 @@ export function getLastSimulationChatMessages(): ProtocolMessage[] | undefined {
   return gLastSimulationChatMessages;
 }
 
-const SimulationSystemPrompt = `
+const simulationSystemPrompt = `
 The following user message describes a bug or other problem on the page which needs to be fixed.
 You must respond with a useful explanation that will help the user understand the source of the problem.
 Do not describe the specific fix needed.
@@ -329,7 +329,7 @@ export async function getSimulationEnhancedPrompt(
   assert(gChatManager, 'Chat not started');
   assert(gChatManager.simulationFinished, 'Simulation not finished');
 
-  let system = SimulationSystemPrompt;
+  let system = simulationSystemPrompt;
 
   if (mouseData) {
     system += `The user pointed to an element on the page <element selector=${JSON.stringify(mouseData.selector)} height=${mouseData.height} width=${mouseData.width} x=${mouseData.x} y=${mouseData.y} />`;
@@ -413,24 +413,24 @@ function getProtocolRule(message: Message): 'user' | 'assistant' | 'system' {
 }
 
 function removeBoltArtifacts(text: string): string {
-  const OpenTag = '<boltArtifact';
-  const CloseTag = '</boltArtifact>';
+  const openTag = '<boltArtifact';
+  const closeTag = '</boltArtifact>';
 
   while (true) {
-    const openTag = text.indexOf(OpenTag);
+    const openTagIndex = text.indexOf(openTag);
 
-    if (openTag === -1) {
+    if (openTagIndex === -1) {
       break;
     }
 
-    const prefix = text.substring(0, openTag);
+    const prefix = text.substring(0, openTagIndex);
 
-    const closeTag = text.indexOf(CloseTag, openTag + OpenTag.length);
+    const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
 
-    if (closeTag === -1) {
+    if (closeTagIndex === -1) {
       text = prefix;
     } else {
-      text = prefix + text.substring(closeTag + CloseTag.length);
+      text = prefix + text.substring(closeTagIndex + closeTag.length);
     }
   }
 
@@ -500,7 +500,7 @@ export async function sendDeveloperChatMessage(
   protocolMessages.unshift({
     role: 'system',
     type: 'text',
-    content: DeveloperSystemPrompt,
+    content: developerSystemPrompt,
   });
 
   return gChatManager.sendChatMessage(protocolMessages, { chatOnly: true, developerFiles, onResponsePart });

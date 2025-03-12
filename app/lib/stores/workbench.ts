@@ -54,7 +54,7 @@ export class WorkbenchStore {
   artifactIdList: string[] = [];
   #globalExecutionQueue = Promise.resolve();
 
-  private fileMap: FileMap = {};
+  private _fileMap: FileMap = {};
 
   constructor() {
     if (import.meta.hot) {
@@ -342,7 +342,7 @@ export class WorkbenchStore {
       const wc = await webcontainer;
       const fullPath = nodePath.join(wc.workdir, data.action.filePath);
 
-      this.fileMap[fullPath] = {
+      this._fileMap[fullPath] = {
         type: 'file',
         content: data.action.content,
         isBinary: false,
@@ -382,9 +382,9 @@ export class WorkbenchStore {
     return artifacts[id];
   }
 
-  private async generateZip() {
+  private async _generateZip() {
     const zip = new JSZip();
-    const files = this.fileMap;
+    const files = this._fileMap;
 
     // Get the project name from the description input, or use a default name
     const projectName = (description.value ?? 'project').toLocaleLowerCase().split(' ').join('_');
@@ -423,12 +423,12 @@ export class WorkbenchStore {
   }
 
   async downloadZip() {
-    const { content, uniqueProjectName } = await this.generateZip();
+    const { content, uniqueProjectName } = await this._generateZip();
     saveAs(content, `${uniqueProjectName}.zip`);
   }
 
   async generateZipBase64() {
-    const { content, uniqueProjectName } = await this.generateZip();
+    const { content, uniqueProjectName } = await this._generateZip();
     const buf = await content.arrayBuffer();
     const contentBase64 = uint8ArrayToBase64(new Uint8Array(buf));
 

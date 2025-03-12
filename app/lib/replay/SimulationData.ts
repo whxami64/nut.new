@@ -1,6 +1,6 @@
 // Data structures for simulation.
 
-export const SimulationDataVersion = '0.1';
+export const simulationDataVersion = '0.1';
 
 // Simulation data specifying the server URL to connect to for static resources.
 interface SimulationPacketServerURL {
