@@ -10,8 +10,10 @@ import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient
 import type { MouseData } from './Recording';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
-import { developerSystemPrompt } from '~/lib/common/prompts/prompts';
-import { detectProjectCommands } from '~/utils/projectCommands';
+import { developerSystemPrompt } from '../common/prompts/prompts';
+import { updateDevelopmentServer } from './DevelopmentServer';
+import { workbenchStore } from '../stores/workbench';
+import { isEnhancedPromptMessage } from '~/components/chat/Chat.client';
 
 function createRepositoryContentsPacket(contents: string): SimulationPacket {
   return {
@@ -184,15 +186,6 @@ class ChatManager {
         if (responseId == eventResponseId) {
           console.log('ChatModifiedFile', file);
           modifiedFiles.push(file);
-
-          const content = `
-        <boltArtifact id="modified-file-${generateRandomId()}" title="File Changes">
-        <boltAction type="file" filePath="${file.path}">${file.content}</boltAction>
-        </boltArtifact>
-        `;
-
-          response += content;
-          options?.onResponsePart?.(content);
         }
       },
     );
@@ -211,21 +204,25 @@ class ChatManager {
       params: { chatId, responseId, messages, chatOnly: options?.chatOnly, developerFiles: options?.developerFiles },
     });
 
-    removeResponseListener();
-    removeFileListener();
-
-    if (modifiedFiles.length) {
-      const commands = await detectProjectCommands(modifiedFiles);
-
+    /*
+     * The modified files are added at the end as inserting them in the middle of the
+     * response can cause weird rendering behavior.
+     */
+    for (const file of modifiedFiles) {
       const content = `
-      <boltArtifact id="project-setup" title="Project Setup">
-      <boltAction type="shell">${commands.setupCommand}</boltAction>
+      <boltArtifact id="modified-file-${generateRandomId()}" title="File Changes">
+      <boltAction type="file" filePath="${file.path}">${file.content}</boltAction>
       </boltArtifact>
       `;
 
       response += content;
       options?.onResponsePart?.(content);
     }
+
+    console.log('ChatResponse', chatId, response);
+
+    removeResponseListener();
+    removeFileListener();
 
     return response;
   }
@@ -250,10 +247,17 @@ function startChat(repositoryContents: string, pageData: SimulationData) {
 
 /*
  * Called when the repository contents have changed. We'll start a new chat
- * with the same interaction data as any existing chat.
+ * with the same interaction data as any existing chat. The remote development
+ * server will also be updated.
  */
-export async function simulationRepositoryUpdated(repositoryContents: string) {
+export async function simulationRepositoryUpdated() {
+  const { contentBase64: repositoryContents } = await workbenchStore.generateZipBase64();
   startChat(repositoryContents, gChatManager?.pageData ?? []);
+
+  const { contentBase64: injectedContents } = await workbenchStore.generateZipBase64(
+    /* injectRecordingMessageHandler */ true,
+  );
+  updateDevelopmentServer(injectedContents);
 }
 
 /*
@@ -400,7 +404,7 @@ Here is the user message you need to evaluate: <user_message>${messageInput}</us
   return false;
 }
 
-function getProtocolRule(message: Message): 'user' | 'assistant' | 'system' {
+function getProtocolRole(message: Message): 'user' | 'assistant' | 'system' {
   switch (message.role) {
     case 'user':
       return 'user';
@@ -443,7 +447,7 @@ function buildProtocolMessages(messages: Message[]): ProtocolMessage[] {
   const rv: ProtocolMessage[] = [];
 
   for (const msg of messages) {
-    const role = getProtocolRule(msg);
+    const role = getProtocolRole(msg);
 
     if (Array.isArray(msg.content)) {
       for (const content of msg.content) {
@@ -478,6 +482,22 @@ function buildProtocolMessages(messages: Message[]): ProtocolMessage[] {
   return rv;
 }
 
+function messagesHaveEnhancedPrompt(messages: Message[]): boolean {
+  const lastEnhancedPromptMessage = messages.findLastIndex((msg) => isEnhancedPromptMessage(msg));
+
+  if (lastEnhancedPromptMessage == -1) {
+    return false;
+  }
+
+  const lastUserMessage = messages.findLastIndex((msg) => msg.role == 'user');
+
+  if (lastUserMessage == -1) {
+    return false;
+  }
+
+  return lastUserMessage < lastEnhancedPromptMessage;
+}
+
 export async function sendDeveloperChatMessage(
   messages: Message[],
   files: FileMap,
@@ -490,7 +510,7 @@ export async function sendDeveloperChatMessage(
   const developerFiles: ProtocolFile[] = [];
 
   for (const [path, file] of Object.entries(files)) {
-    if (file?.type == 'file' && shouldIncludeFile(path)) {
+    if (file && shouldIncludeFile(path)) {
       developerFiles.push({
         path,
         content: file.content,
@@ -498,11 +518,22 @@ export async function sendDeveloperChatMessage(
     }
   }
 
+  let systemPrompt = developerSystemPrompt;
+
+  if (messagesHaveEnhancedPrompt(messages)) {
+    // Add directions to the LLM when we have an enhanced prompt describing the bug to fix.
+    const systemEnhancedPrompt = `
+ULTRA IMPORTANT: You have been given a detailed description of a bug you need to fix.
+Focus specifically on fixing this bug. Do not guess about other problems.
+    `;
+    systemPrompt += systemEnhancedPrompt;
+  }
+
   const protocolMessages = buildProtocolMessages(messages);
   protocolMessages.unshift({
     role: 'system',
     type: 'text',
-    content: developerSystemPrompt,
+    content: systemPrompt,
   });
 
   return gChatManager.sendChatMessage(protocolMessages, { chatOnly: true, developerFiles, onResponsePart });

@@ -1,32 +1,25 @@
 import { atom, map, type MapStore, type ReadableAtom, type WritableAtom } from 'nanostores';
 import type { EditorDocument, ScrollPosition } from '~/components/editor/codemirror/CodeMirrorEditor';
-import { ActionRunner } from '~/lib/runtime/action-runner';
 import type { ActionCallbackData, ArtifactCallbackData } from '~/lib/runtime/message-parser';
-import { webcontainer } from '~/lib/webcontainer';
-import type { ITerminal } from '~/types/terminal';
 import { unreachable } from '~/utils/unreachable';
 import { EditorStore } from './editor';
 import { FilesStore, type FileMap } from './files';
-import { PreviewsStore } from './previews';
-import { TerminalStore } from './terminal';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Octokit, type RestEndpointMethodTypes } from '@octokit/rest';
-import * as nodePath from 'node:path';
-import { extractRelativePath } from '~/utils/diff';
 import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
-import { createSampler } from '~/utils/sampler';
-import { uint8ArrayToBase64 } from '~/lib/replay/ReplayProtocolClient';
+import { uint8ArrayToBase64 } from '../replay/ReplayProtocolClient';
 import type { ActionAlert } from '~/types/actions';
-import { extractFileArtifactsFromRepositoryContents } from '~/lib/replay/Problems';
+import { extractFileArtifactsFromRepositoryContents } from '../replay/Problems';
+import { onRepositoryFileWritten } from '~/components/chat/Chat.client';
+import { doInjectRecordingMessageHandler } from '../replay/Recording';
 
 export interface ArtifactState {
   id: string;
   title: string;
   type?: string;
   closed: boolean;
-  runner: ActionRunner;
 }
 
 export type ArtifactUpdateState = Pick<ArtifactState, 'title' | 'closed'>;
@@ -36,12 +29,10 @@ type Artifacts = MapStore<Record<string, ArtifactState>>;
 export type WorkbenchViewType = 'code' | 'preview';
 
 export class WorkbenchStore {
-  #previewsStore = new PreviewsStore(webcontainer);
-  #filesStore = new FilesStore(webcontainer);
+  #filesStore = new FilesStore();
   #editorStore = new EditorStore(this.#filesStore);
-  #terminalStore = new TerminalStore(webcontainer);
 
-  #reloadedMessages = new Set<string>();
+  previewURL = atom<string | undefined>(undefined);
 
   artifacts: Artifacts = import.meta.hot?.data.artifacts ?? map({});
 
@@ -53,8 +44,6 @@ export class WorkbenchStore {
   modifiedFiles = new Set<string>();
   artifactIdList: string[] = [];
   #globalExecutionQueue = Promise.resolve();
-
-  private _fileMap: FileMap = {};
 
   constructor() {
     if (import.meta.hot) {
@@ -68,10 +57,6 @@ export class WorkbenchStore {
 
   addToExecutionQueue(callback: () => Promise<void>) {
     this.#globalExecutionQueue = this.#globalExecutionQueue.then(() => callback());
-  }
-
-  get previews() {
-    return this.#previewsStore.previews;
   }
 
   get files() {
@@ -94,32 +79,11 @@ export class WorkbenchStore {
     return this.#filesStore.filesCount;
   }
 
-  get showTerminal() {
-    return this.#terminalStore.showTerminal;
-  }
-  get boltTerminal() {
-    return this.#terminalStore.boltTerminal;
-  }
   get alert() {
     return this.actionAlert;
   }
   clearAlert() {
     this.actionAlert.set(undefined);
-  }
-
-  toggleTerminal(value?: boolean) {
-    this.#terminalStore.toggleTerminal(value);
-  }
-
-  attachTerminal(terminal: ITerminal) {
-    this.#terminalStore.attachTerminal(terminal);
-  }
-  attachBoltTerminal(terminal: ITerminal) {
-    this.#terminalStore.attachBoltTerminal(terminal);
-  }
-
-  onTerminalResize(cols: number, rows: number) {
-    this.#terminalStore.onTerminalResize(cols, rows);
   }
 
   setDocuments(files: FileMap) {
@@ -128,7 +92,7 @@ export class WorkbenchStore {
     if (this.#filesStore.filesCount > 0 && this.currentDocument.get() === undefined) {
       // we find the first file and select it
       for (const [filePath, dirent] of Object.entries(files)) {
-        if (dirent?.type === 'file') {
+        if (dirent) {
           this.setSelectedFile(filePath);
           break;
         }
@@ -254,10 +218,6 @@ export class WorkbenchStore {
     // TODO: what do we wanna do and how do we wanna recover from this?
   }
 
-  setReloadedMessages(messages: string[]) {
-    this.#reloadedMessages = new Set(messages);
-  }
-
   addArtifact({ messageId, title, id, type }: ArtifactCallbackData) {
     const artifact = this.#getArtifact(messageId);
 
@@ -274,17 +234,6 @@ export class WorkbenchStore {
       title,
       closed: false,
       type,
-      runner: new ActionRunner(
-        webcontainer,
-        () => this.boltTerminal,
-        (alert) => {
-          if (this.#reloadedMessages.has(messageId)) {
-            return;
-          }
-
-          this.actionAlert.set(alert);
-        },
-      ),
     });
   }
 
@@ -297,94 +246,54 @@ export class WorkbenchStore {
 
     this.artifacts.setKey(messageId, { ...artifact, ...state });
   }
-  addAction(data: ActionCallbackData) {
-    // this._addAction(data);
 
-    this.addToExecutionQueue(() => this._addAction(data));
+  runAction(data: ActionCallbackData) {
+    this.addToExecutionQueue(() => this._runAction(data));
   }
-  async _addAction(data: ActionCallbackData) {
+
+  async _runAction(data: ActionCallbackData) {
     const { messageId } = data;
 
     const artifact = this.#getArtifact(messageId);
 
     if (!artifact) {
       unreachable('Artifact not found');
-    }
-
-    return artifact.runner.addAction(data);
-  }
-
-  runAction(data: ActionCallbackData, isStreaming: boolean = false) {
-    if (isStreaming) {
-      this.actionStreamSampler(data, isStreaming);
-    } else {
-      this.addToExecutionQueue(() => this._runAction(data, isStreaming));
-    }
-  }
-  async _runAction(data: ActionCallbackData, isStreaming: boolean = false) {
-    const { messageId } = data;
-
-    const artifact = this.#getArtifact(messageId);
-
-    if (!artifact) {
-      unreachable('Artifact not found');
-    }
-
-    if (data.actionId != 'restore-contents-action-id') {
-      const action = artifact.runner.actions.get()[data.actionId];
-
-      if (!action || action.executed) {
-        return;
-      }
     }
 
     if (data.action.type === 'file') {
-      const wc = await webcontainer;
-      const fullPath = nodePath.join(wc.workdir, data.action.filePath);
+      const { filePath, content } = data.action;
 
-      this._fileMap[fullPath] = {
-        type: 'file',
-        content: data.action.content,
-        isBinary: false,
-      };
+      const existingFiles = this.files.get();
+      this.files.set({
+        ...existingFiles,
+        [filePath]: {
+          path: filePath,
+          content,
+        },
+      });
 
-      if (this.selectedFile.value !== fullPath) {
-        this.setSelectedFile(fullPath);
+      onRepositoryFileWritten();
+
+      if (this.selectedFile.value !== filePath) {
+        this.setSelectedFile(filePath);
       }
 
       if (this.currentView.value !== 'code') {
         this.currentView.set('code');
       }
 
-      const doc = this.#editorStore.documents.get()[fullPath];
-
-      if (!doc) {
-        await artifact.runner.runAction(data, isStreaming);
-      }
-
-      this.#editorStore.updateFile(fullPath, data.action.content);
-
-      if (!isStreaming) {
-        await artifact.runner.runAction(data);
-        this.resetAllFileModifications();
-      }
-    } else {
-      await artifact.runner.runAction(data);
+      this.#editorStore.updateFile(filePath, content);
     }
   }
-
-  actionStreamSampler = createSampler(async (data: ActionCallbackData, isStreaming: boolean = false) => {
-    return await this._runAction(data, isStreaming);
-  }, 100); // TODO: remove this magic number to have it configurable
 
   #getArtifact(id: string) {
     const artifacts = this.artifacts.get();
     return artifacts[id];
   }
 
-  private async _generateZip() {
+  private async _generateZip(injectRecordingMessageHandler = false) {
     const zip = new JSZip();
-    const files = this._fileMap;
+    const files = this.files.get();
 
     // Get the project name from the description input, or use a default name
     const projectName = (description.value ?? 'project').toLocaleLowerCase().split(' ').join('_');
@@ -394,12 +303,15 @@ export class WorkbenchStore {
     const uniqueProjectName = `${projectName}_${timestampHash}`;
 
     for (const [filePath, dirent] of Object.entries(files)) {
-      if (dirent?.type === 'file' && !dirent.isBinary) {
-        const relativePath = extractRelativePath(filePath);
-        const content = dirent.content;
+      if (dirent) {
+        let content = dirent.content;
+
+        if (injectRecordingMessageHandler && filePath == 'index.html') {
+          content = doInjectRecordingMessageHandler(content);
+        }
 
         // split the path into segments
-        const pathSegments = relativePath.split('/');
+        const pathSegments = filePath.split('/');
 
         // if there's more than one segment, we need to create folders
         if (pathSegments.length > 1) {
@@ -411,7 +323,7 @@ export class WorkbenchStore {
           currentFolder.file(pathSegments[pathSegments.length - 1], content);
         } else {
           // if there's only one segment, it's a file in the root
-          zip.file(relativePath, content);
+          zip.file(filePath, content);
         }
       }
     }
@@ -427,8 +339,8 @@ export class WorkbenchStore {
     saveAs(content, `${uniqueProjectName}.zip`);
   }
 
-  async generateZipBase64() {
-    const { content, uniqueProjectName } = await this._generateZip();
+  async generateZipBase64(injectRecordingMessageHandler = false) {
+    const { content, uniqueProjectName } = await this._generateZip(injectRecordingMessageHandler);
     const buf = await content.arrayBuffer();
     const contentBase64 = uint8ArrayToBase64(new Uint8Array(buf));
 
@@ -445,17 +357,16 @@ export class WorkbenchStore {
     const fileRelativePaths = new Set<string>();
 
     for (const [filePath, dirent] of Object.entries(files)) {
-      if (dirent?.type === 'file' && !dirent.isBinary) {
-        const relativePath = extractRelativePath(filePath);
-        fileRelativePaths.add(relativePath);
+      if (dirent) {
+        fileRelativePaths.add(filePath);
 
         const content = dirent.content;
 
-        const artifact = fileArtifacts.find((artifact) => artifact.path === relativePath);
+        const artifact = fileArtifacts.find((artifact) => artifact.path === filePath);
         const artifactContent = artifact?.content ?? '';
 
         if (content != artifactContent) {
-          modifiedFilePaths.add(relativePath);
+          modifiedFilePaths.add(filePath);
         }
       }
     }
@@ -487,7 +398,6 @@ export class WorkbenchStore {
         },
       };
 
-      this.addAction(data);
       this.runAction(data);
     }
   }
@@ -497,9 +407,8 @@ export class WorkbenchStore {
     const syncedFiles = [];
 
     for (const [filePath, dirent] of Object.entries(files)) {
-      if (dirent?.type === 'file' && !dirent.isBinary) {
-        const relativePath = extractRelativePath(filePath);
-        const pathSegments = relativePath.split('/');
+      if (dirent) {
+        const pathSegments = filePath.split('/');
         let currentHandle = targetHandle;
 
         for (let i = 0; i < pathSegments.length - 1; i++) {
@@ -516,7 +425,7 @@ export class WorkbenchStore {
         await writable.write(dirent.content);
         await writable.close();
 
-        syncedFiles.push(relativePath);
+        syncedFiles.push(filePath);
       }
     }
 
@@ -567,14 +476,14 @@ export class WorkbenchStore {
       // Create blobs for each file
       const blobs = await Promise.all(
         Object.entries(files).map(async ([filePath, dirent]) => {
-          if (dirent?.type === 'file' && dirent.content) {
+          if (dirent) {
             const { data: blob } = await octokit.git.createBlob({
               owner: repo.owner.login,
               repo: repo.name,
               content: Buffer.from(dirent.content).toString('base64'),
               encoding: 'base64',
             });
-            return { path: extractRelativePath(filePath), sha: blob.sha };
+            return { path: filePath, sha: blob.sha };
           }
 
           return null;

@@ -7,7 +7,7 @@ import type { Message } from 'ai';
 import { useAnimate } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { cssTransition, toast, ToastContainer } from 'react-toastify';
-import { useMessageParser, useShortcuts, useSnapScroll } from '~/lib/hooks';
+import { useMessageParser, useSnapScroll } from '~/lib/hooks';
 import { description, useChatHistory } from '~/lib/persistence';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -170,8 +170,7 @@ async function clearActiveChat() {
   gActiveChatMessageTelemetry = undefined;
 
   if (gUpdateSimulationAfterChatMessage) {
-    const { contentBase64 } = await workbenchStore.generateZipBase64();
-    await simulationRepositoryUpdated(contentBase64);
+    await simulationRepositoryUpdated();
     gUpdateSimulationAfterChatMessage = false;
   }
 }
@@ -180,8 +179,7 @@ export async function onRepositoryFileWritten() {
   if (gActiveChatMessageTelemetry) {
     gUpdateSimulationAfterChatMessage = true;
   } else {
-    const { contentBase64 } = await workbenchStore.generateZipBase64();
-    await simulationRepositoryUpdated(contentBase64);
+    await simulationRepositoryUpdated();
   }
 }
 
@@ -189,10 +187,14 @@ function buildMessageId(prefix: string, chatId: string) {
   return `${prefix}-${chatId}`;
 }
 
+const EnhancedPromptPrefix = 'enhanced-prompt';
+
+export function isEnhancedPromptMessage(message: Message): boolean {
+  return message.id.startsWith(EnhancedPromptPrefix);
+}
+
 export const ChatImpl = memo(
   ({ description, initialMessages, storeMessageHistory, importChat, exportChat }: ChatProps) => {
-    useShortcuts();
-
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]); // Move here
@@ -321,7 +323,7 @@ export const ChatImpl = memo(
       }
 
       const enhancedPromptMessage: Message = {
-        id: buildMessageId('enhanced-prompt', chatId),
+        id: buildMessageId(EnhancedPromptPrefix, chatId),
         role: 'assistant',
         content: message,
       };

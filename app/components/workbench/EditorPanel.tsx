@@ -13,13 +13,10 @@ import { PanelHeader } from '~/components/ui/PanelHeader';
 import { PanelHeaderButton } from '~/components/ui/PanelHeaderButton';
 import type { FileMap } from '~/lib/stores/files';
 import { themeStore } from '~/lib/stores/theme';
-import { WORK_DIR } from '~/utils/constants';
 import { renderLogger } from '~/utils/logger';
 import { isMobile } from '~/utils/mobile';
 import { FileBreadcrumb } from './FileBreadcrumb';
 import { FileTree } from './FileTree';
-import { DEFAULT_TERMINAL_SIZE, TerminalTabs } from './terminal/TerminalTabs';
-import { workbenchStore } from '~/lib/stores/workbench';
 
 interface EditorPanelProps {
   files?: FileMap;
@@ -34,7 +31,7 @@ interface EditorPanelProps {
   onFileReset?: () => void;
 }
 
-const DEFAULT_EDITOR_SIZE = 100 - DEFAULT_TERMINAL_SIZE;
+const DEFAULT_EDITOR_SIZE = 100;
 
 const editorSettings: EditorSettings = { tabSize: 2 };
 
@@ -54,7 +51,6 @@ export const EditorPanel = memo(
     renderLogger.trace('EditorPanel');
 
     const theme = useStore(themeStore);
-    const showTerminal = useStore(workbenchStore.showTerminal);
 
     const activeFileSegments = useMemo(() => {
       if (!editorDocument) {
@@ -70,7 +66,7 @@ export const EditorPanel = memo(
 
     return (
       <PanelGroup direction="vertical">
-        <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
+        <Panel defaultSize={DEFAULT_EDITOR_SIZE} minSize={20}>
           <PanelGroup direction="horizontal">
             <Panel defaultSize={20} minSize={10} collapsible>
               <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
@@ -81,9 +77,7 @@ export const EditorPanel = memo(
                 <FileTree
                   className="h-full"
                   files={files}
-                  hideRoot
                   unsavedFiles={unsavedFiles}
-                  rootFolder={WORK_DIR}
                   selectedFile={selectedFile}
                   onFileSelect={onFileSelect}
                 />
@@ -126,7 +120,6 @@ export const EditorPanel = memo(
           </PanelGroup>
         </Panel>
         <PanelResizeHandle />
-        <TerminalTabs />
       </PanelGroup>
     );
   },
