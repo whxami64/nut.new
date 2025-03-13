@@ -336,7 +336,7 @@ function buildFileList(files: FileMap, hiddenFiles: Array<string | RegExp>): Nod
 
   const defaultDepth = 0;
 
-  for (const [filePath, dirent] of Object.entries(files)) {
+  for (const filePath of Object.keys(files)) {
     const segments = filePath.split('/').filter((segment) => segment);
     const fileName = segments.at(-1);
 

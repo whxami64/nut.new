@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import git, { type GitAuth, type PromiseFsClient } from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
-import type { ProtocolFile } from '../replay/SimulationPrompt';
-import type { FileMap } from '../stores/files';
+import type { ProtocolFile } from '~/lib/replay/SimulationPrompt';
+import type { FileMap } from '~/lib/stores/files';
 
 const lookupSavedPassword = (url: string) => {
   const domain = url.split('/')[2];
@@ -115,9 +115,7 @@ function createFileFromEncoding(path: string, data: any, encoding: string | unde
 
 const getFs = (files: FileMap) => ({
   promises: {
-    readFile: async (path: string, options: any) => {
-      const encoding = options?.encoding;
-
+    readFile: async (path: string, _options: any) => {
       try {
         const result = files[path]?.content;
 
@@ -130,31 +128,31 @@ const getFs = (files: FileMap) => ({
       const encoding = options.encoding;
       files[path] = createFileFromEncoding(path, data, encoding);
     },
-    mkdir: async (path: string, options: any) => {},
-    readdir: async (path: string, options: any) => {
+    mkdir: (_path: string, _options: any) => {},
+    readdir: async (_path: string, _options: any) => {
       throw new Error('NYI');
     },
-    rm: async (path: string, options: any) => {
+    rm: async (_path: string, _options: any) => {
       throw new Error('NYI');
     },
-    rmdir: async (path: string, options: any) => {
+    rmdir: async (_path: string, _options: any) => {
       throw new Error('NYI');
     },
-    unlink: async (path: string) => {
+    unlink: async (_path: string) => {
       throw new Error('NYI');
     },
-    stat: async (path: string) => {
+    stat: async (_path: string) => {
       throw new Error('NYI');
     },
-    lstat: async (path: string) => {
+    lstat: async (_path: string) => {
       throw new Error('NYI');
     },
-    readlink: async (path: string) => {
+    readlink: async (_path: string) => {
       throw new Error('NYI');
     },
-    symlink: async (target: string, path: string) => {
+    symlink: async (_target: string, _path: string) => {
       throw new Error('NYI');
     },
-    chmod: async (_path: string, _mode: number) => {},
+    chmod: (_path: string, _mode: number) => {},
   },
 });

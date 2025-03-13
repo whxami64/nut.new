@@ -9,11 +9,11 @@ import { saveAs } from 'file-saver';
 import { Octokit, type RestEndpointMethodTypes } from '@octokit/rest';
 import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
-import { uint8ArrayToBase64 } from '../replay/ReplayProtocolClient';
+import { uint8ArrayToBase64 } from '~/lib/replay/ReplayProtocolClient';
 import type { ActionAlert } from '~/types/actions';
-import { extractFileArtifactsFromRepositoryContents } from '../replay/Problems';
+import { extractFileArtifactsFromRepositoryContents } from '~/lib/replay/Problems';
 import { onRepositoryFileWritten } from '~/components/chat/Chat.client';
-import { doInjectRecordingMessageHandler } from '../replay/Recording';
+import { doInjectRecordingMessageHandler } from '~/lib/replay/Recording';
 
 export interface ArtifactState {
   id: string;

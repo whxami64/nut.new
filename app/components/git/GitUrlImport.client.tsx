@@ -54,7 +54,6 @@ export function GitUrlImport() {
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));
-          const textDecoder = new TextDecoder('utf-8');
 
           const fileContents = filePaths
             .map((filePath) => {

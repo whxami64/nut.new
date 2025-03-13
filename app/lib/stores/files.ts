@@ -2,7 +2,7 @@ import { map, type MapStore } from 'nanostores';
 import { computeFileModifications } from '~/utils/diff';
 import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
-import type { ProtocolFile } from '../replay/SimulationPrompt';
+import type { ProtocolFile } from '~/lib/replay/SimulationPrompt';
 
 const logger = createScopedLogger('FilesStore');
 

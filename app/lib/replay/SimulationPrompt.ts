@@ -10,9 +10,9 @@ import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient
 import type { MouseData } from './Recording';
 import type { FileMap } from '~/lib/stores/files';
 import { shouldIncludeFile } from '~/utils/fileUtils';
-import { developerSystemPrompt } from '../common/prompts/prompts';
+import { developerSystemPrompt } from '~/lib/common/prompts/prompts';
 import { updateDevelopmentServer } from './DevelopmentServer';
-import { workbenchStore } from '../stores/workbench';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { isEnhancedPromptMessage } from '~/components/chat/Chat.client';
 
 function createRepositoryContentsPacket(contents: string): SimulationPacket {
