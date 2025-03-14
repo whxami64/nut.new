@@ -1,9 +1,8 @@
 // Support using the Nut API for the development server.
 
-import { debounce } from '~/utils/debounce';
 import { assert, ProtocolClient } from './ReplayProtocolClient';
 import { workbenchStore } from '~/lib/stores/workbench';
-import { toast } from 'react-toastify';
+import { recordingMessageHandlerScript } from './Recording';
 
 class DevelopmentServerManager {
   // Empty if this chat has been destroyed.
@@ -33,7 +32,7 @@ class DevelopmentServerManager {
     this.client = undefined;
   }
 
-  async setRepositoryContents(contents: string): Promise<string | undefined> {
+  async setRepositoryContents(repositoryId: string): Promise<string | undefined> {
     assert(this.client, 'Chat has been destroyed');
 
     try {
@@ -42,7 +41,8 @@ class DevelopmentServerManager {
         method: 'Nut.startDevelopmentServer',
         params: {
           chatId,
-          repositoryContents: contents,
+          repositoryId,
+          injectedScript: recordingMessageHandlerScript,
         },
       })) as { url: string };
 
@@ -56,21 +56,21 @@ class DevelopmentServerManager {
 
 let gActiveDevelopmentServer: DevelopmentServerManager | undefined;
 
-const debounceSetRepositoryContents = debounce(async (repositoryContents: string) => {
+export async function updateDevelopmentServer(repositoryId: string) {
+  workbenchStore.showWorkbench.set(true);
+  workbenchStore.repositoryId.set(repositoryId);
+  workbenchStore.previewURL.set(undefined);
+  workbenchStore.previewError.set(false);
+
   if (!gActiveDevelopmentServer) {
     gActiveDevelopmentServer = new DevelopmentServerManager();
   }
 
-  const url = await gActiveDevelopmentServer.setRepositoryContents(repositoryContents);
+  const url = await gActiveDevelopmentServer.setRepositoryContents(repositoryId);
 
-  if (!url) {
-    toast.error('Failed to start development server');
+  if (url) {
+    workbenchStore.previewURL.set(url);
+  } else {
+    workbenchStore.previewError.set(true);
   }
-
-  workbenchStore.previewURL.set(url);
-}, 500);
-
-export async function updateDevelopmentServer(repositoryContents: string) {
-  workbenchStore.previewURL.set(undefined);
-  debounceSetRepositoryContents(repositoryContents);
 }

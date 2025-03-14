@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import type { Message } from 'ai';
 import { toast } from 'react-toastify';
 import { createChatFromFolder } from '~/utils/folderImport';
-import { logStore } from '~/lib/stores/logs'; // Assuming logStore is imported from this location
+import { logStore } from '~/lib/stores/logs';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
 import type { BoltProblem } from '~/lib/replay/Problems';
-import { getProblem, extractFileArtifactsFromRepositoryContents } from '~/lib/replay/Problems';
+import { getProblem } from '~/lib/replay/Problems';
+import { createRepositoryImported } from '~/lib/replay/Repository';
 
 interface LoadProblemButtonProps {
   className?: string;
@@ -71,15 +72,13 @@ export async function loadProblem(
 
   const { repositoryContents, title: problemTitle } = problem;
 
-  const fileArtifacts = await extractFileArtifactsFromRepositoryContents(repositoryContents);
-
   try {
-    const messages = await createChatFromFolder(fileArtifacts, [], 'problem');
+    const repositoryId = await createRepositoryImported(`ImportProblem:${problemId}`, repositoryContents);
+    const messages = createChatFromFolder('problem', repositoryId);
     await importChat(`Problem: ${problemTitle}`, [...messages]);
 
     logStore.logSystem('Problem loaded successfully', {
       problemId,
-      textFileCount: fileArtifacts.length,
     });
     toast.success('Problem loaded successfully');
   } catch (error) {

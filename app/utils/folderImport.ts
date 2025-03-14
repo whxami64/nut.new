@@ -1,13 +1,14 @@
-import type { Message } from 'ai';
-import { generateId, shouldIncludeFile } from './fileUtils';
+import type { Message } from '~/lib/persistence/useChatHistory';
+import { generateId } from './fileUtils';
+import JSZip from 'jszip';
 
-export interface FileArtifact {
+interface FileArtifact {
   content: string;
   path: string;
 }
 
-export async function getFileArtifacts(files: File[]): Promise<FileArtifact[]> {
-  return Promise.all(
+export async function getFileRepositoryContents(files: File[]): Promise<string> {
+  const artifacts: FileArtifact[] = await Promise.all(
     files.map(async (file) => {
       return new Promise<FileArtifact>((resolve, reject) => {
         const reader = new FileReader();
@@ -25,34 +26,19 @@ export async function getFileArtifacts(files: File[]): Promise<FileArtifact[]> {
       });
     }),
   );
+
+  const zip = new JSZip();
+  for (const { path, content } of artifacts) {
+    zip.file(path, content);
+  }
+  return await zip.generateAsync({ type: "base64" });
 }
 
-export const createChatFromFolder = async (
-  fileArtifacts: FileArtifact[],
-  binaryFiles: string[],
+export function createChatFromFolder(
   folderName: string,
-): Promise<Message[]> => {
-  const binaryFilesMessage =
-    binaryFiles.length > 0
-      ? `\n\nSkipped ${binaryFiles.length} binary files:\n${binaryFiles.map((f) => `- ${f}`).join('\n')}`
-      : '';
-
-  let filesContent = `I've imported the contents of the "${folderName}" folder.${binaryFilesMessage}`;
-  filesContent += `<boltArtifact id="imported-files" title="Imported Files">`;
-
-  for (const file of fileArtifacts) {
-    if (shouldIncludeFile(file.path)) {
-      filesContent += `<boltAction type="file" filePath="${file.path}">${file.content}</boltAction>\n\n`;
-    }
-  }
-  filesContent += `</boltArtifact>`;
-
-  const filesMessage: Message = {
-    role: 'assistant',
-    content: filesContent,
-    id: generateId(),
-    createdAt: new Date(),
-  };
+  repositoryId: string
+): Message[] {
+  let filesContent = `I've imported the contents of the "${folderName}" folder.`;
 
   const userMessage: Message = {
     role: 'user',
@@ -61,7 +47,15 @@ export const createChatFromFolder = async (
     createdAt: new Date(),
   };
 
+  const filesMessage: Message = {
+    role: 'assistant',
+    content: filesContent,
+    id: generateId(),
+    createdAt: new Date(),
+    repositoryId,
+  };
+
   const messages = [userMessage, filesMessage];
 
   return messages;
-};
+}

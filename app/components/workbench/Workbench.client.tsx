@@ -1,40 +1,17 @@
 import { useStore } from '@nanostores/react';
-import { motion, type HTMLMotionProps, type Variants } from 'framer-motion';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
-import {
-  type OnChangeCallback as OnEditorChange,
-  type OnScrollCallback as OnEditorScroll,
-} from '~/components/editor/codemirror/CodeMirrorEditor';
+import { motion, type Variants } from 'framer-motion';
+import { memo } from 'react';
 import { IconButton } from '~/components/ui/IconButton';
-import { PanelHeaderButton } from '~/components/ui/PanelHeaderButton';
-import { Slider, type SliderOptions } from '~/components/ui/Slider';
-import { workbenchStore, type WorkbenchViewType } from '~/lib/stores/workbench';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
-import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
-import Cookies from 'js-cookie';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
-  isStreaming?: boolean;
 }
-
-const viewTransition = { ease: cubicEasingFn };
-
-const sliderOptions: SliderOptions<WorkbenchViewType> = {
-  left: {
-    value: 'code',
-    text: 'Code',
-  },
-  right: {
-    value: 'preview',
-    text: 'Preview',
-  },
-};
 
 const workbenchVariants = {
   closed: {
@@ -53,117 +30,12 @@ const workbenchVariants = {
   },
 } satisfies Variants;
 
-export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => {
+export const Workbench = memo(({ chatStarted }: WorkspaceProps) => {
   renderLogger.trace('Workbench');
 
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  const previewURL = useStore(workbenchStore.previewURL);
   const showWorkbench = useStore(workbenchStore.showWorkbench);
-  const selectedFile = useStore(workbenchStore.selectedFile);
-  const currentDocument = useStore(workbenchStore.currentDocument);
-  const unsavedFiles = useStore(workbenchStore.unsavedFiles);
-  const files = useStore(workbenchStore.files);
-  const selectedView = useStore(workbenchStore.currentView);
 
   const isSmallViewport = useViewport(1024);
-
-  const setSelectedView = (view: WorkbenchViewType) => {
-    workbenchStore.currentView.set(view);
-  };
-
-  useEffect(() => {
-    if (previewURL) {
-      setSelectedView('preview');
-    }
-  }, [previewURL]);
-
-  useEffect(() => {
-    workbenchStore.setDocuments(files);
-  }, [files]);
-
-  const onEditorChange = useCallback<OnEditorChange>((update) => {
-    workbenchStore.setCurrentDocumentContent(update.content);
-  }, []);
-
-  const onEditorScroll = useCallback<OnEditorScroll>((position) => {
-    workbenchStore.setCurrentDocumentScrollPosition(position);
-  }, []);
-
-  const onFileSelect = useCallback((filePath: string | undefined) => {
-    workbenchStore.setSelectedFile(filePath);
-  }, []);
-
-  const onFileSave = useCallback(() => {
-    workbenchStore.saveCurrentDocument().catch(() => {
-      toast.error('Failed to update file content');
-    });
-  }, []);
-
-  const onFileReset = useCallback(() => {
-    workbenchStore.resetCurrentDocument();
-  }, []);
-
-  const handleSyncFiles = useCallback(async () => {
-    setIsSyncing(true);
-
-    try {
-      const directoryHandle = await window.showDirectoryPicker();
-      await workbenchStore.syncFiles(directoryHandle);
-      toast.success('Files synced successfully');
-    } catch (error) {
-      console.error('Error syncing files:', error);
-      toast.error('Failed to sync files');
-    } finally {
-      setIsSyncing(false);
-    }
-  }, []);
-
-  const handleApplyChanges = useCallback(async () => {
-    try {
-      // Open file picker and get file handle
-      const [fileHandle] = await (window as any).showOpenFilePicker({
-        types: [
-          {
-            description: 'Text Files',
-            accept: {
-              'text/*': ['.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.html', '.css'],
-            },
-          },
-        ],
-      });
-
-      const changesFile = await fileHandle.getFile();
-      const changesContent = await changesFile.text();
-
-      let path = '';
-      let contents = '';
-
-      async function saveCurrentFile() {
-        if (path) {
-          await workbenchStore.saveFileContents('/home/project/src/' + path, contents);
-        }
-      }
-
-      for (const line of changesContent.split('\n')) {
-        const match = /^FILE (.*)/.exec(line);
-
-        if (match) {
-          await saveCurrentFile();
-          path = match[1];
-          contents = '';
-          continue;
-        }
-
-        contents += line + '\n';
-      }
-
-      await saveCurrentFile();
-    } catch (error) {
-      console.error('Error applying changes:', error);
-      toast.error('Failed to apply changes');
-    }
-  }, []);
 
   return (
     chatStarted && (
@@ -187,63 +59,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
           <div className="absolute inset-0 px-2 lg:px-6">
             <div className="h-full flex flex-col bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor shadow-sm rounded-lg overflow-hidden">
               <div className="flex items-center px-3 py-2 border-b border-bolt-elements-borderColor">
-                <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />
                 <div className="ml-auto" />
-                {selectedView === 'code' && (
-                  <div className="flex overflow-y-auto">
-                    <PanelHeaderButton className="mr-1 text-sm" onClick={handleApplyChanges}>
-                      <div className="i-ph:code" />
-                      Apply Changes
-                    </PanelHeaderButton>
-                    <PanelHeaderButton
-                      className="mr-1 text-sm"
-                      onClick={() => {
-                        workbenchStore.downloadZip();
-                      }}
-                    >
-                      <div className="i-ph:code" />
-                      Download Code
-                    </PanelHeaderButton>
-                    <PanelHeaderButton className="mr-1 text-sm" onClick={handleSyncFiles} disabled={isSyncing}>
-                      {isSyncing ? <div className="i-ph:spinner" /> : <div className="i-ph:cloud-arrow-down" />}
-                      {isSyncing ? 'Syncing...' : 'Sync Files'}
-                    </PanelHeaderButton>
-                    <PanelHeaderButton
-                      className="mr-1 text-sm"
-                      onClick={() => {
-                        const repoName = prompt(
-                          'Please enter a name for your new GitHub repository:',
-                          'bolt-generated-project',
-                        );
-
-                        if (!repoName) {
-                          alert('Repository name is required. Push to GitHub cancelled.');
-                          return;
-                        }
-
-                        const githubUsername = Cookies.get('githubUsername');
-                        const githubToken = Cookies.get('githubToken');
-
-                        if (!githubUsername || !githubToken) {
-                          const usernameInput = prompt('Please enter your GitHub username:');
-                          const tokenInput = prompt('Please enter your GitHub personal access token:');
-
-                          if (!usernameInput || !tokenInput) {
-                            alert('GitHub username and token are required. Push to GitHub cancelled.');
-                            return;
-                          }
-
-                          workbenchStore.pushToGitHub(repoName, usernameInput, tokenInput);
-                        } else {
-                          workbenchStore.pushToGitHub(repoName, githubUsername, githubToken);
-                        }
-                      }}
-                    >
-                      <div className="i-ph:github-logo" />
-                      Push to GitHub
-                    </PanelHeaderButton>
-                  </div>
-                )}
                 <IconButton
                   icon="i-ph:x-circle"
                   className="-mr-1"
@@ -254,45 +70,12 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                 />
               </div>
               <div className="relative flex-1 overflow-hidden">
-                <View
-                  initial={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                  animate={{ x: selectedView === 'code' ? 0 : '-100%' }}
-                >
-                  <EditorPanel
-                    editorDocument={currentDocument}
-                    isStreaming={isStreaming}
-                    selectedFile={selectedFile}
-                    files={files}
-                    unsavedFiles={unsavedFiles}
-                    onFileSelect={onFileSelect}
-                    onEditorScroll={onEditorScroll}
-                    onEditorChange={onEditorChange}
-                    onFileSave={onFileSave}
-                    onFileReset={onFileReset}
-                  />
-                </View>
-                <View
-                  initial={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                  animate={{ x: selectedView === 'preview' ? 0 : '100%' }}
-                >
-                  <Preview />
-                </View>
+                <Preview />
               </div>
             </div>
           </div>
         </div>
       </motion.div>
     )
-  );
-});
-interface ViewProps extends HTMLMotionProps<'div'> {
-  children: JSX.Element;
-}
-
-const View = memo(({ children, ...props }: ViewProps) => {
-  return (
-    <motion.div className="absolute inset-0" transition={viewTransition} {...props}>
-      {children}
-    </motion.div>
   );
 });
