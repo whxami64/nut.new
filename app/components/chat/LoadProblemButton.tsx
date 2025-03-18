@@ -20,7 +20,7 @@ export function setLastLoadedProblem(problem: BoltProblem) {
     localStorage.setItem('loadedProblemId', problem.problemId);
     localStorage.setItem('loadedProblem', problemSerialized);
   } catch (error: any) {
-    // Remove loadedProblem, so we don't accidentally associate a solution with the wrong problem.
+    // Remove loadedProblem, so we don't accidentally associate (e.g. reproduction) data with the wrong problem.
     localStorage.removeItem('loadedProblem');
     console.error(
       `Failed to set last loaded problem (size=${(problemSerialized.length / 1024).toFixed(2)}kb):`,
