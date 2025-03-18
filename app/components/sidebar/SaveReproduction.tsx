@@ -70,15 +70,19 @@ export function SaveReproductionModal() {
       console.log('SubmitReproduction');
 
       const simulationData = getLastUserSimulationData();
+
       if (!simulationData) {
         toast.error('No simulation data found');
         return;
       }
+
       const messages = getLastSimulationChatMessages();
+
       if (!messages) {
         toast.error('No user prompt found');
         return;
       }
+
       const reproData = { simulationData, messages };
 
       /**
@@ -87,6 +91,7 @@ export function SaveReproductionModal() {
       const solution: BoltProblemSolution = {
         evaluator: problem.solution?.evaluator,
         ...reproData,
+
         /*
          * TODO: Also store recordingId for easier debugging.
          * recordingId,
