@@ -12,7 +12,7 @@ import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { SaveProblem } from './SaveProblem';
-import { SaveSolution } from './SaveSolution';
+import { SaveReproductionModal } from './SaveReproduction';
 import { getNutIsAdmin } from '~/lib/replay/Problems';
 
 const menuVariants = {
@@ -140,7 +140,7 @@ export const Menu = () => {
             Problems
           </a>
           <SaveProblem />
-          {getNutIsAdmin() && <SaveSolution />}
+          {getNutIsAdmin() && <SaveReproductionModal />}
           <a
             href="/about"
             className="flex gap-2 bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"

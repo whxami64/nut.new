@@ -1,8 +1,8 @@
 import { toast } from 'react-toastify';
 import ReactModal from 'react-modal';
 import { useState } from 'react';
-import { BoltProblemStatus, updateProblem } from '~/lib/replay/Problems';
-import type { BoltProblem, BoltProblemInput } from '~/lib/replay/Problems';
+import { updateProblem } from '~/lib/replay/Problems';
+import type { BoltProblem, BoltProblemInput, BoltProblemSolution } from '~/lib/replay/Problems';
 import { getOrFetchLastLoadedProblem } from '~/components/chat/LoadProblemButton';
 import {
   getLastUserSimulationData,
@@ -18,52 +18,38 @@ ReactModal.setAppElement('#root');
  * the problem the current chat was loaded from.
  */
 
-export function SaveSolution() {
+export function SaveReproductionModal() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    evaluator: '',
-  });
-  const [savedSolution, setSavedSolution] = useState<boolean>(false);
+  const [savedReproduction, setSavedReproduction] = useState<boolean>(false);
   const [problem, setProblem] = useState<BoltProblem | null>(null);
 
-  const handleSaveSolution = async () => {
+  const handleSaveReproduction = async () => {
     const loadId = toast.loading('Loading problem...');
 
     try {
-      const savedProblem = await getOrFetchLastLoadedProblem();
+      const lastProblem = await getOrFetchLastLoadedProblem();
 
-      if (!savedProblem) {
+      if (!lastProblem) {
         toast.error('No problem loaded');
         return;
       }
 
-      setProblem(savedProblem);
-      setFormData({
-        evaluator: savedProblem.solution?.evaluator || '',
-      });
+      setProblem(lastProblem);
     } finally {
       toast.dismiss(loadId);
     }
-    setSavedSolution(false);
+    setSavedReproduction(false);
     setIsModalOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmitSolution = async () => {
+  const handleSubmitReproduction = async () => {
     if (!problem) {
       toast.error('No problem loaded');
       return;
     }
 
     if (!isSimulatingOrHasFinished()) {
-      toast.error('No simulation found (neither in progress nor finished)');
+      toast.error('No simulation data found (neither in progress nor finished)');
       return;
     }
 
@@ -80,9 +66,8 @@ export function SaveSolution() {
         toast.dismiss(loadId);
       }
 
-      toast.info('Submitting solution...');
-
-      console.log('SubmitSolution', formData);
+      toast.info('Submitting reproduction...');
+      console.log('SubmitReproduction');
 
       const simulationData = getLastUserSimulationData();
 
@@ -98,40 +83,33 @@ export function SaveSolution() {
         return;
       }
 
-      /*
-       * The evaluator is only present when the problem has been solved.
-       * We still create a "solution" object even if it hasn't been
-       * solved quite yet, which is used for working on the problem.
-       *
+      const reproData = { simulationData, messages };
+
+      /**
        * TODO: Split `solution` into `reproData` and `evaluator`.
        */
-      const evaluator = formData.evaluator.length ? formData.evaluator : undefined;
+      const solution: BoltProblemSolution = {
+        evaluator: problem.solution?.evaluator,
+        ...reproData,
+
+        /*
+         * TODO: Also store recordingId for easier debugging.
+         * recordingId,
+         */
+      };
 
       const problemUpdatePacket: BoltProblemInput = {
+        ...problem,
         version: 2,
-        title: problem.title,
-        description: problem.description,
-        username: problem.username,
-        repositoryContents: problem.repositoryContents,
-        status: evaluator ? BoltProblemStatus.Solved : BoltProblemStatus.Unsolved,
-        solution: {
-          simulationData,
-          messages,
-          evaluator,
-
-          /*
-           * TODO: Also store recordingId for easier debugging.
-           * recordingId,
-           */
-        },
+        solution,
       };
 
       await updateProblem(problem.problemId, problemUpdatePacket);
 
-      setSavedSolution(true);
+      setSavedReproduction(true);
     } catch (error: any) {
-      console.error('Error saving solution', error?.stack || error);
-      toast.error(`Error saving solution: ${error?.message}`);
+      console.error('Error saving reproduction', error?.stack || error);
+      toast.error(`Error saving reproduction: ${error?.message}`);
     }
   };
 
@@ -140,9 +118,9 @@ export function SaveSolution() {
       <a
         href="#"
         className="flex gap-2 bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"
-        onClick={handleSaveSolution}
+        onClick={handleSaveReproduction}
       >
-        Save Solution
+        Save Reproduction
       </a>
       <ReactModal
         isOpen={isModalOpen}
@@ -150,9 +128,9 @@ export function SaveSolution() {
         className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 max-w-2xl w-full z-50"
         overlayClassName="fixed inset-0 bg-black bg-opacity-50 z-40"
       >
-        {savedSolution && (
+        {savedReproduction && (
           <>
-            <div className="text-center mb-2">Solution Saved</div>
+            <div className="text-center mb-2">Reproduction Saved</div>
             <div className="text-center">
               <div className="flex justify-center gap-2 mt-4">
                 <button
@@ -165,27 +143,16 @@ export function SaveSolution() {
             </div>
           </>
         )}
-        {!savedSolution && (
+        {!savedReproduction && (
           <>
-            <div className="text-center">Save solution for loaded problem from last prompt and recording.</div>
-            <div className="text-center">Evaluator describes a condition the explanation must satisfy.</div>
             <div className="text-center">
-              Leave the evaluator blank if the API explanation is not right and the problem isn't solved yet.
+              Save reproduction data (prompt, user annotations + simulationData) for the currently loaded problem:{' '}
+              {problem?.problemId}
             </div>
             <div style={{ marginTop: '10px' }}>
-              <div className="grid grid-cols-[auto_1fr] gap-4 max-w-md mx-auto">
-                <div className="flex items-center">Evaluator:</div>
-                <input
-                  type="text"
-                  name="evaluator"
-                  className="bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary rounded px-2 w-full border border-gray-300"
-                  value={formData.evaluator}
-                  onChange={handleInputChange}
-                />
-              </div>
               <div className="flex justify-center gap-2 mt-4">
                 <button
-                  onClick={handleSubmitSolution}
+                  onClick={handleSubmitReproduction}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   Submit
