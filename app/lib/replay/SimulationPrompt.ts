@@ -194,8 +194,7 @@ export function simulationAddData(data: SimulationData) {
 }
 
 export function simulationFinishData() {
-  assert(gChatManager, 'Expected to have an active chat');
-  gChatManager.finishSimulationData();
+  gChatManager?.finishSimulationData();
 }
 
 let gLastUserSimulationData: SimulationData | undefined;
