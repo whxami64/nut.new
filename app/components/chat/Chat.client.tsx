@@ -18,12 +18,11 @@ import { debounce } from '~/utils/debounce';
 import { useSearchParams } from '@remix-run/react';
 import { createSampler } from '~/utils/sampler';
 import {
-  getSimulationRecording,
-  getSimulationEnhancedPrompt,
   simulationAddData,
+  simulationFinishData,
   simulationRepositoryUpdated,
-  shouldUseSimulation,
-  sendDeveloperChatMessage,
+  sendChatMessage,
+  type ChatReference,
 } from '~/lib/replay/SimulationPrompt';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '~/components/workbench/Preview';
@@ -32,8 +31,9 @@ import { anthropicNumFreeUsesCookieName, anthropicApiKeyCookieName, maxFreeUses 
 import { getNutLoginKey, submitFeedback } from '~/lib/replay/Problems';
 import { ChatMessageTelemetry, pingTelemetry } from '~/lib/hooks/pingTelemetry';
 import type { RejectChangeData } from './ApproveChange';
-import { generateRandomId } from '~/lib/replay/ReplayProtocolClient';
-import { getMessagesRepositoryId, getPreviousRepositoryId, type Message } from '~/lib/persistence/useChatHistory';
+import { assert, generateRandomId } from '~/lib/replay/ReplayProtocolClient';
+import { getMessagesRepositoryId, getPreviousRepositoryId } from '~/lib/persistence/useChatHistory';
+import type { Message } from '~/lib/persistence/message';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -64,15 +64,11 @@ async function flushSimulationData() {
   //console.log("HaveSimulationData", simulationData.length);
 
   // Add the simulation data to the chat.
-  await simulationAddData(simulationData);
+  simulationAddData(simulationData);
 }
 
-let gLockSimulationData = false;
-
 setInterval(async () => {
-  if (!gLockSimulationData) {
-    flushSimulationData();
-  }
+  flushSimulationData();
 }, 1000);
 
 export function Chat() {
@@ -152,16 +148,6 @@ let gActiveChatMessageTelemetry: ChatMessageTelemetry | undefined;
 
 async function clearActiveChat() {
   gActiveChatMessageTelemetry = undefined;
-}
-
-function buildMessageId(prefix: string, chatId: string) {
-  return `${prefix}-${chatId}`;
-}
-
-const EnhancedPromptPrefix = 'enhanced-prompt';
-
-export function isEnhancedPromptMessage(message: Message): boolean {
-  return message.id.startsWith(EnhancedPromptPrefix);
 }
 
 export const ChatImpl = memo(
@@ -261,50 +247,6 @@ export const ChatImpl = memo(
       setChatStarted(true);
     };
 
-    const createRecording = async (chatId: string) => {
-      let recordingId, message;
-
-      try {
-        recordingId = await getSimulationRecording();
-        message = `[Recording of the bug](https://app.replay.io/recording/${recordingId})\n\n`;
-      } catch (e) {
-        console.error('Error creating recording', e);
-        message = 'Error creating recording.';
-      }
-
-      const recordingMessage: Message = {
-        id: buildMessageId('create-recording', chatId),
-        role: 'assistant',
-        content: message,
-      };
-
-      return { recordingId, recordingMessage };
-    };
-
-    const getEnhancedPrompt = async (chatId: string, userMessage: string) => {
-      let enhancedPrompt,
-        message,
-        hadError = false;
-
-      try {
-        const mouseData = getCurrentMouseData();
-        enhancedPrompt = await getSimulationEnhancedPrompt(messages, userMessage, mouseData);
-        message = `Explanation of the bug:\n\n${enhancedPrompt}`;
-      } catch (e) {
-        console.error('Error enhancing prompt', e);
-        message = 'Error enhancing prompt.';
-        hadError = true;
-      }
-
-      const enhancedPromptMessage: Message = {
-        id: buildMessageId(EnhancedPromptPrefix, chatId),
-        role: 'assistant',
-        content: message,
-      };
-
-      return { enhancedPrompt, enhancedPromptMessage, hadError };
-    };
-
     const sendMessage = async (messageInput?: string) => {
       const _input = messageInput || input;
       const numAbortsAtStart = gNumAborts;
@@ -340,130 +282,81 @@ export const ChatImpl = memo(
       setActiveChatId(chatId);
 
       const userMessage: Message = {
-        id: buildMessageId('user', chatId),
+        id: `user-${chatId}`,
         role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: _input,
-          },
-          ...imageDataList.map((imageData) => ({
-            type: 'image',
-            image: imageData,
-          })),
-        ] as any, // Type assertion to bypass compiler check
+        type: 'text',
+        content: _input,
       };
 
       let newMessages = [...messages, userMessage];
+
+      imageDataList.forEach((imageData, index) => {
+        const imageMessage: Message = {
+          id: `image-${chatId}-${index}`,
+          role: 'user',
+          type: 'image',
+          dataURL: imageData,
+        };
+        newMessages.push(imageMessage);
+      });
+
       setMessages(newMessages);
 
       // Add file cleanup here
       setUploadedFiles([]);
       setImageDataList([]);
 
-      let simulation = false;
-
-      try {
-        simulation = chatStarted && (await shouldUseSimulation(_input));
-      } catch (e) {
-        console.error('Error checking simulation', e);
-      }
-
-      if (numAbortsAtStart != gNumAborts) {
-        return;
-      }
-
-      console.log('UseSimulation', simulation);
-
-      let simulationStatus = 'NoSimulation';
-
-      if (simulation) {
-        gActiveChatMessageTelemetry.startSimulation();
-
-        gLockSimulationData = true;
-
-        try {
-          await flushSimulationData();
-
-          const createRecordingPromise = createRecording(chatId);
-          const enhancedPromptPromise = getEnhancedPrompt(chatId, _input);
-
-          const { recordingId, recordingMessage } = await createRecordingPromise;
-
-          if (numAbortsAtStart != gNumAborts) {
-            return;
-          }
-
-          console.log('RecordingMessage', recordingMessage);
-          newMessages = [...newMessages, recordingMessage];
-          setMessages(newMessages);
-
-          if (recordingId) {
-            const info = await enhancedPromptPromise;
-
-            if (numAbortsAtStart != gNumAborts) {
-              return;
-            }
-
-            console.log('EnhancedPromptMessage', info.enhancedPromptMessage);
-            newMessages = [...newMessages, info.enhancedPromptMessage];
-            setMessages(newMessages);
-
-            simulationStatus = info.hadError ? 'PromptError' : 'Success';
-          } else {
-            simulationStatus = 'RecordingError';
-          }
-
-          gActiveChatMessageTelemetry.endSimulation(simulationStatus);
-        } finally {
-          gLockSimulationData = false;
-        }
-      }
+      await flushSimulationData();
+      simulationFinishData();
 
       chatStore.setKey('aborted', false);
 
       runAnimation();
 
-      gActiveChatMessageTelemetry.sendPrompt(simulationStatus);
-
-      const responseMessageId = buildMessageId('response', chatId);
-      let responseMessageContent = '';
-      let responseRepositoryId: string | undefined;
-      let hasResponseMessage = false;
-
-      const updateResponseMessage = () => {
+      const addResponseMessage = (msg: Message) => {
         if (gNumAborts != numAbortsAtStart) {
           return;
         }
 
         newMessages = [...newMessages];
 
-        if (hasResponseMessage) {
+        const lastMessage = newMessages[newMessages.length - 1];
+
+        if (lastMessage.id == msg.id) {
           newMessages.pop();
+          assert(lastMessage.type == 'text', 'Last message must be a text message');
+          assert(msg.type == 'text', 'Message must be a text message');
+          newMessages.push({
+            ...msg,
+            content: lastMessage.content + msg.content,
+          });
+        } else {
+          newMessages.push(msg);
         }
 
-        newMessages.push({
-          id: responseMessageId,
-          role: 'assistant',
-          content: responseMessageContent,
-          repositoryId: responseRepositoryId,
-        });
         setMessages(newMessages);
-        hasResponseMessage = true;
       };
 
-      const addResponseContent = (content: string) => {
-        responseMessageContent += content;
-        updateResponseMessage();
-      };
+      const references: ChatReference[] = [];
+
+      const mouseData = getCurrentMouseData();
+
+      if (mouseData) {
+        references.push({
+          kind: 'element',
+          selector: mouseData.selector,
+          x: mouseData.x,
+          y: mouseData.y,
+          width: mouseData.width,
+          height: mouseData.height,
+        });
+      }
 
       try {
-        const repositoryId = getMessagesRepositoryId(newMessages);
-        responseRepositoryId = await sendDeveloperChatMessage(newMessages, repositoryId, addResponseContent);
-        updateResponseMessage();
+        await sendChatMessage(newMessages, references, addResponseMessage);
       } catch (e) {
+        toast.error('Error sending message');
         console.error('Error sending message', e);
-        addResponseContent('Error sending message.');
       }
 
       if (gNumAborts != numAbortsAtStart) {
@@ -480,9 +373,14 @@ export const ChatImpl = memo(
 
       textareaRef.current?.blur();
 
-      if (responseRepositoryId) {
+      const existingRepositoryId = getMessagesRepositoryId(messages);
+      const responseRepositoryId = getMessagesRepositoryId(newMessages);
+
+      if (responseRepositoryId && existingRepositoryId != responseRepositoryId) {
         simulationRepositoryUpdated(responseRepositoryId);
-        setApproveChangesMessageId(responseMessageId);
+
+        const lastMessage = newMessages[newMessages.length - 1];
+        setApproveChangesMessageId(lastMessage.id);
       }
     };
 
