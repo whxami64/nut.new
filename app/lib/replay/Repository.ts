@@ -12,13 +12,10 @@ export async function getRepositoryContents(repositoryId: string): Promise<strin
 // Remotely create an imported repository from the given contents.
 export async function createRepositoryImported(reason: string, repositoryContents: string): Promise<string> {
   const rv = (await sendCommandDedicatedClient({
-    method: 'Nut.createRepository',
+    method: 'Nut.importRepository',
     params: {
       repositoryContents,
-      origin: {
-        kind: 'imported',
-        reason,
-      },
+      reason,
     },
   })) as { repositoryId: string };
   return rv.repositoryId;

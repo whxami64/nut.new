@@ -110,11 +110,17 @@ class ChatManager {
     });
   }
 
-  finishSimulationData() {
+  async finishSimulationData() {
     assert(this.client, 'Chat has been destroyed');
     assert(!this.simulationFinished, 'Simulation has been finished');
 
     this.simulationFinished = true;
+
+    const chatId = await this.chatIdPromise;
+    await this.client.sendCommand({
+      method: 'Nut.finishSimulationData',
+      params: { chatId },
+    });
   }
 
   async sendChatMessage(messages: Message[], references: ChatReference[], onResponsePart: ChatResponsePartCallback) {
