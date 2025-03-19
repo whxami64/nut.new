@@ -110,15 +110,11 @@ class ChatManager {
     });
   }
 
-  finishSimulationData(): SimulationData {
+  finishSimulationData() {
     assert(this.client, 'Chat has been destroyed');
     assert(!this.simulationFinished, 'Simulation has been finished');
-    assert(this.repositoryId, 'Expected repository ID');
 
-    const allData = [createRepositoryIdPacket(this.repositoryId), ...this.pageData];
     this.simulationFinished = true;
-
-    return allData;
   }
 
   async sendChatMessage(messages: Message[], references: ChatReference[], onResponsePart: ChatResponsePartCallback) {
@@ -152,14 +148,16 @@ class ChatManager {
 // There is only one chat active at a time.
 let gChatManager: ChatManager | undefined;
 
-function startChat(repositoryId: string, pageData: SimulationData) {
+function startChat(repositoryId: string | undefined, pageData: SimulationData) {
   if (gChatManager) {
     gChatManager.destroy();
   }
 
   gChatManager = new ChatManager();
 
-  gChatManager.setRepositoryId(repositoryId);
+  if (repositoryId) {
+    gChatManager.setRepositoryId(repositoryId);
+  }
 
   if (pageData.length) {
     gChatManager.addPageData(pageData);
@@ -179,13 +177,22 @@ export function simulationRepositoryUpdated(repositoryId: string) {
  * Called when the page gathering interaction data has been reloaded. We'll
  * start a new chat with the same repository contents as any existing chat.
  */
-export async function simulationReloaded() {
+export function simulationReloaded() {
   assert(gChatManager, 'Expected to have an active chat');
 
   const repositoryId = gChatManager.repositoryId;
   assert(repositoryId, 'Expected active chat to have repository ID');
 
   startChat(repositoryId, []);
+}
+
+/*
+ * Called when the current message has finished with no repository change.
+ * We'll start a new chat with the same simulation data as the previous chat.
+ */
+export function simulationReset() {
+  assert(gChatManager, 'Expected to have an active chat');
+  startChat(gChatManager.repositoryId, gChatManager.pageData);
 }
 
 export function simulationAddData(data: SimulationData) {

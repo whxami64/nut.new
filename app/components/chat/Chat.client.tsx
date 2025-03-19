@@ -23,6 +23,7 @@ import {
   simulationRepositoryUpdated,
   sendChatMessage,
   type ChatReference,
+  simulationReset,
 } from '~/lib/replay/SimulationPrompt';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '~/components/workbench/Preview';
@@ -216,6 +217,7 @@ export const ChatImpl = memo(
       if (gActiveChatMessageTelemetry) {
         gActiveChatMessageTelemetry.abort('StopButtonClicked');
         clearActiveChat();
+        simulationReset();
       }
     };
 
@@ -381,6 +383,8 @@ export const ChatImpl = memo(
 
         const lastMessage = newMessages[newMessages.length - 1];
         setApproveChangesMessageId(lastMessage.id);
+      } else {
+        simulationReset();
       }
     };
 
