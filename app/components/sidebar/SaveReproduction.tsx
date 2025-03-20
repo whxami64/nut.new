@@ -8,6 +8,7 @@ import {
   getLastUserSimulationData,
   getLastSimulationChatMessages,
   isSimulatingOrHasFinished,
+  getLastSimulationChatReferences,
 } from '~/lib/replay/SimulationPrompt';
 
 ReactModal.setAppElement('#root');
@@ -66,13 +67,14 @@ export function SaveReproductionModal() {
       }
 
       const messages = getLastSimulationChatMessages();
+      const references = getLastSimulationChatReferences();
 
       if (!messages) {
         toast.error('No user prompt found');
         return;
       }
 
-      const reproData = { simulationData, messages };
+      const reproData = { simulationData, messages, references };
 
       /**
        * TODO: Split `solution` into `reproData` and `evaluator`.
