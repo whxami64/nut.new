@@ -177,7 +177,10 @@ export async function deleteProblem(problemId: string): Promise<void | undefined
   return undefined;
 }
 
-export async function updateProblem(problemId: string, problem: BoltProblemInput): Promise<void | undefined> {
+export async function updateProblem(
+  problemId: string,
+  problem: BoltProblemInput,
+): Promise<void | undefined | BoltProblem> {
   if (shouldUseSupabase()) {
     return supabaseUpdateProblem(problemId, problem);
   }

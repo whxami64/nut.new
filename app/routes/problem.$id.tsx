@@ -24,7 +24,12 @@ function Comments({ comments }: { comments: BoltProblemComment[] }) {
         <div key={index} className="bg-bolt-elements-background-depth-2 rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-bolt-text">{comment.username ?? 'Anonymous'}</span>
-            <span className="text-sm text-bolt-text-secondary">{new Date(comment.timestamp).toLocaleString()}</span>
+            <span className="text-sm text-bolt-text-secondary">
+              {(() => {
+                const date = new Date(comment.timestamp);
+                return date && !isNaN(date.getTime()) ? date.toLocaleString() : 'Unknown date';
+              })()}
+            </span>
           </div>
           <div className="text-bolt-text whitespace-pre-wrap">{comment.content}</div>
         </div>
@@ -247,7 +252,13 @@ function ViewProblemPage() {
       const newProblem = callback(problemData);
       setProblemData(newProblem);
       console.log('BackendUpdateProblem', problemId, newProblem);
-      await backendUpdateProblem(problemId, newProblem);
+
+      const updatedProblem = await backendUpdateProblem(problemId, newProblem);
+
+      // If we got an updated problem back from the backend, use it to update the UI
+      if (updatedProblem && typeof updatedProblem !== 'undefined') {
+        setProblemData(updatedProblem);
+      }
     },
     [problemData],
   );

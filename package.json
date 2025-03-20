@@ -9,9 +9,9 @@
   "scripts": {
     "deploy": "vercel deploy --prod",
     "build": "npx remix vite:build",
-    "dev": "node pre-start.cjs  && npx remix vite:dev",
-    "dev:supabase": "USE_SUPABASE=true node pre-start.cjs  && npx remix vite:dev",
-    "dev:legacy": "USE_SUPABASE=false node pre-start.cjs  && npx remix vite:dev",
+    "dev": "pnpm run dev:legacy",
+    "dev:supabase": "node pre-start.cjs && USE_SUPABASE=true npx remix vite:dev",
+    "dev:legacy": "node pre-start.cjs && USE_SUPABASE=false npx remix vite:dev",
     "test": "vitest --run --exclude tests/e2e",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

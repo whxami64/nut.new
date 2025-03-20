@@ -98,7 +98,7 @@ export async function supabaseGetProblem(problemId: string): Promise<BoltProblem
       username,
       comments: data.problem_comments.map((comment: any) => ({
         id: comment.id,
-        createdAt: comment.created_at,
+        timestamp: comment.created_at,
         problemId: comment.problem_id,
         content: comment.content,
         username: comment.username,
@@ -159,11 +159,11 @@ export async function supabaseDeleteProblem(problemId: string): Promise<void | u
   }
 }
 
-export async function supabaseUpdateProblem(problemId: string, problem: BoltProblemInput): Promise<void | undefined> {
+export async function supabaseUpdateProblem(problemId: string, problem: BoltProblemInput): Promise<BoltProblem | null> {
   try {
     if (!getNutIsAdmin()) {
       toast.error('Admin user required');
-      return undefined;
+      return null;
     }
 
     // Extract comments to add separately if needed
@@ -192,37 +192,53 @@ export async function supabaseUpdateProblem(problemId: string, problem: BoltProb
        * Create a unique identifier for each comment based on content and timestamp.
        * This allows us to use upsert with onConflict to avoid duplicates.
        */
-      const commentInserts = comments.map((comment) => ({
-        problem_id: problemId,
-        content: comment.content,
-        username: comment.username || getUsername() || 'Anonymous',
+      const commentInserts = comments.map((comment) => {
+        // Ensure timestamp is a valid number
+        const timestamp =
+          typeof comment.timestamp === 'number' && !isNaN(comment.timestamp) ? comment.timestamp : Date.now();
 
-        /**
-         * Use timestamp as a unique identifier for the comment.
-         * This assumes that comments with the same timestamp are the same comment.
-         */
-        created_at: new Date(comment.timestamp).toISOString(),
-      }));
+        return {
+          problem_id: problemId,
+          content: comment.content,
+          username: comment.username || getUsername() || 'Anonymous',
+
+          /**
+           * Use timestamp as a unique identifier for the comment.
+           * This assumes that comments with the same timestamp are the same comment.
+           */
+          created_at: new Date(timestamp).toISOString(),
+        };
+      });
 
       /**
        * Use upsert with onConflict to avoid duplicates.
        * This will insert new comments and ignore existing ones based on created_at.
        */
-      const { error: commentsError } = await getSupabase().from('problem_comments').upsert(commentInserts, {
-        onConflict: 'created_at',
-        ignoreDuplicates: true,
-      });
+      const { error: commentsError, data: commentsData } = await getSupabase()
+        .from('problem_comments')
+        .upsert(commentInserts, {
+          onConflict: 'created_at',
+          ignoreDuplicates: true,
+        })
+        .select();
+
+      console.log('commentsData', commentsData);
 
       if (commentsError) {
         throw commentsError;
       }
     }
+
+    // Fetch the updated problem with comments to return to the caller
+    const updatedProblem = await supabaseGetProblem(problemId);
+
+    return updatedProblem;
   } catch (error) {
     console.error('Error updating problem', error);
     toast.error('Failed to update problem');
-  }
 
-  return undefined;
+    return undefined;
+  }
 }
 
 export async function supabaseSubmitFeedback(feedback: any) {
