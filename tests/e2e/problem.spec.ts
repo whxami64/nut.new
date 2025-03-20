@@ -111,3 +111,26 @@ test('Confirm that isAdmin is saved correctly', async ({ page }) => {
   await page.reload();
   await expect(await page.getByRole('button', { name: 'Set Status' })).toBeVisible();
 });
+
+test('Should be able to add a comment to a problem', async ({ page }) => {
+  await page.goto('/problems?showAll=true');
+  await page.getByRole('combobox').selectOption('all');
+  await page.getByRole('link', { name: '[test] playwright' }).first().click();
+
+  if (await isSupabaseEnabled(page)) {
+    await login(page);
+  } else {
+    await setLoginKey(page);
+  }
+
+  // Add a comment to the problem
+  const comment = `test comment ${Date.now().toString()}`;
+  await page.getByRole('textbox', { name: 'Add a comment...' }).click();
+  await page.getByRole('textbox', { name: 'Add a comment...' }).fill(comment);
+  await page.getByRole('button', { name: 'Add Comment' }).click();
+  await expect(page.locator('[data-testid="problem-comment"]').filter({ hasText: comment })).toBeVisible();
+
+  // Reload the page and check that the comment is still visible
+  await page.reload();
+  await expect(page.locator('[data-testid="problem-comment"]').filter({ hasText: comment })).toBeVisible();
+});

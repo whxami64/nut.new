@@ -159,11 +159,11 @@ export async function supabaseDeleteProblem(problemId: string): Promise<void | u
   }
 }
 
-export async function supabaseUpdateProblem(problemId: string, problem: BoltProblemInput): Promise<BoltProblem | null> {
+export async function supabaseUpdateProblem(problemId: string, problem: BoltProblemInput): Promise<void> {
   try {
     if (!getNutIsAdmin()) {
       toast.error('Admin user required');
-      return null;
+      return undefined;
     }
 
     // Extract comments to add separately if needed
@@ -214,25 +214,17 @@ export async function supabaseUpdateProblem(problemId: string, problem: BoltProb
        * Use upsert with onConflict to avoid duplicates.
        * This will insert new comments and ignore existing ones based on created_at.
        */
-      const { error: commentsError, data: commentsData } = await getSupabase()
-        .from('problem_comments')
-        .upsert(commentInserts, {
-          onConflict: 'created_at',
-          ignoreDuplicates: true,
-        })
-        .select();
-
-      console.log('commentsData', commentsData);
+      const { error: commentsError } = await getSupabase().from('problem_comments').upsert(commentInserts, {
+        onConflict: 'created_at',
+        ignoreDuplicates: true,
+      });
 
       if (commentsError) {
         throw commentsError;
       }
     }
 
-    // Fetch the updated problem with comments to return to the caller
-    const updatedProblem = await supabaseGetProblem(problemId);
-
-    return updatedProblem;
+    return undefined;
   } catch (error) {
     console.error('Error updating problem', error);
     toast.error('Failed to update problem');

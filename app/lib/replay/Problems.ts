@@ -177,19 +177,16 @@ export async function deleteProblem(problemId: string): Promise<void | undefined
   return undefined;
 }
 
-export async function updateProblem(
-  problemId: string,
-  problem: BoltProblemInput,
-): Promise<void | undefined | BoltProblem> {
+export async function updateProblem(problemId: string, problem: BoltProblemInput): Promise<BoltProblem | null> {
   if (shouldUseSupabase()) {
-    return supabaseUpdateProblem(problemId, problem);
+    await supabaseUpdateProblem(problemId, problem);
   }
 
   try {
     if (!getNutIsAdmin()) {
       toast.error('Admin user required');
 
-      return undefined;
+      return null;
     }
 
     const loginKey = Cookies.get(nutLoginKeyCookieName);
@@ -200,14 +197,14 @@ export async function updateProblem(
         params: { problemId, problem, loginKey },
       },
     });
-
-    return undefined;
   } catch (error) {
     console.error('Error updating problem', error);
     toast.error('Failed to update problem');
   }
 
-  return undefined;
+  const updatedProblem = await getProblem(problemId);
+
+  return updatedProblem;
 }
 
 const nutLoginKeyCookieName = 'nutLoginKey';

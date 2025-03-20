@@ -21,7 +21,11 @@ function Comments({ comments }: { comments: BoltProblemComment[] }) {
   return (
     <div className="space-y-4 mt-6">
       {comments.map((comment, index) => (
-        <div key={index} className="bg-bolt-elements-background-depth-2 rounded-lg p-4 shadow-sm">
+        <div
+          data-testid="problem-comment"
+          key={index}
+          className="bg-bolt-elements-background-depth-2 rounded-lg p-4 shadow-sm"
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-bolt-text">{comment.username ?? 'Anonymous'}</span>
             <span className="text-sm text-bolt-text-secondary">
@@ -250,13 +254,10 @@ function ViewProblemPage() {
       }
 
       const newProblem = callback(problemData);
-      setProblemData(newProblem);
-      console.log('BackendUpdateProblem', problemId, newProblem);
-
       const updatedProblem = await backendUpdateProblem(problemId, newProblem);
 
       // If we got an updated problem back from the backend, use it to update the UI
-      if (updatedProblem && typeof updatedProblem !== 'undefined') {
+      if (updatedProblem) {
         setProblemData(updatedProblem);
       }
     },

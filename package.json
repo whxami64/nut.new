@@ -9,7 +9,7 @@
   "scripts": {
     "deploy": "vercel deploy --prod",
     "build": "npx remix vite:build",
-    "dev": "pnpm run dev:legacy",
+    "dev": "node pre-start.cjs && npx remix vite:dev",
     "dev:supabase": "node pre-start.cjs && USE_SUPABASE=true npx remix vite:dev",
     "dev:legacy": "node pre-start.cjs && USE_SUPABASE=false npx remix vite:dev",
     "test": "vitest --run --exclude tests/e2e",
