@@ -116,6 +116,9 @@ class ChatManager {
     }
 
     const chatId = await this.chatIdPromise;
+
+    console.log('ChatAddPageData', new Date().toISOString(), chatId, data.length);
+
     await this.client.sendCommand({
       method: 'Nut.addSimulationData',
       params: { chatId, simulationData: data },
