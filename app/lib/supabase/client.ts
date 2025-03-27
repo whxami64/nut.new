@@ -15,7 +15,7 @@ export interface Database {
           description: string;
           status: 'Pending' | 'Solved' | 'Unsolved';
           keywords: string[];
-          repository_contents: Json;
+          repository_id: string;
           user_id: string | null;
           problem_comments: Database['public']['Tables']['problem_comments']['Row'][];
           solution: Json;

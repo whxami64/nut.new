@@ -3,14 +3,102 @@ import ReactModal from 'react-modal';
 import { useState, useEffect } from 'react';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { submitProblem, BoltProblemStatus } from '~/lib/replay/Problems';
-import type { BoltProblemInput } from '~/lib/replay/Problems';
-import { getRepositoryContents } from '~/lib/replay/Repository';
+import type { BoltProblemInput, BoltProblemSolution } from '~/lib/replay/Problems';
 import { shouldUseSupabase, getCurrentUser } from '~/lib/supabase/client';
 import { authModalStore } from '~/lib/stores/authModal';
 import { authStatusStore } from '~/lib/stores/auth';
 import { useStore } from '@nanostores/react';
+import {
+  getLastUserSimulationData,
+  getLastSimulationChatMessages,
+  isSimulatingOrHasFinished,
+  getLastSimulationChatReferences,
+} from '~/lib/replay/SimulationPrompt';
 
 ReactModal.setAppElement('#root');
+
+// External functions for problem storage
+
+async function saveProblem(
+  title: string,
+  description: string,
+  username: string,
+  reproData: any,
+): Promise<string | null> {
+  if (!title) {
+    toast.error('Please fill in title field');
+    return null;
+  }
+
+  if (!shouldUseSupabase() && !username) {
+    toast.error('Please enter a username');
+    return null;
+  }
+
+  toast.info('Submitting problem...');
+
+  const repositoryId = workbenchStore.repositoryId.get();
+
+  if (!repositoryId) {
+    toast.error('No repository ID found');
+    return null;
+  }
+
+  const solution: BoltProblemSolution = {
+    evaluator: undefined,
+    ...reproData,
+  };
+
+  const problem: BoltProblemInput = {
+    version: 2,
+    title,
+    description,
+    username: shouldUseSupabase() ? (undefined as any) : username,
+    user_id: shouldUseSupabase() ? (await getCurrentUser())?.id || '' : undefined,
+    repositoryId,
+    status: BoltProblemStatus.Pending,
+    solution,
+  };
+
+  const problemId = await submitProblem(problem);
+
+  if (problemId) {
+    localStorage.setItem('loadedProblemId', problemId);
+  }
+
+  return problemId;
+}
+
+function getReproductionData(): any | null {
+  if (!isSimulatingOrHasFinished()) {
+    toast.error('No simulation data found (neither in progress nor finished)');
+    return null;
+  }
+
+  try {
+    const simulationData = getLastUserSimulationData();
+
+    if (!simulationData) {
+      toast.error('No simulation data found');
+      return null;
+    }
+
+    const messages = getLastSimulationChatMessages();
+    const references = getLastSimulationChatReferences();
+
+    if (!messages) {
+      toast.error('No user prompt found');
+      return null;
+    }
+
+    return { simulationData, messages, references };
+  } catch (error: any) {
+    console.error('Error getting reproduction data', error?.stack || error);
+    toast.error(`Error getting reproduction data: ${error?.message}`);
+
+    return null;
+  }
+}
 
 // Component for saving the current chat as a new problem.
 
@@ -22,6 +110,7 @@ export function SaveProblem() {
     username: '',
   });
   const [problemId, setProblemId] = useState<string | null>(null);
+  const [reproData, setReproData] = useState<any>(null);
   const isLoggedIn = useStore(authStatusStore.isLoggedIn);
   const username = useStore(authStatusStore.username);
 
@@ -35,6 +124,14 @@ export function SaveProblem() {
   const handleSaveProblem = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const currentReproData = getReproductionData();
+
+    if (!currentReproData) {
+      return;
+    }
+
+    setReproData(currentReproData);
     setIsModalOpen(true);
     setProblemId(null);
   };
@@ -53,42 +150,14 @@ export function SaveProblem() {
   };
 
   const handleSubmitProblem = async () => {
-    if (!formData.title) {
-      toast.error('Please fill in title field');
+    if (!reproData) {
       return;
     }
 
-    if (!shouldUseSupabase() && !formData.username) {
-      toast.error('Please enter a username');
-      return;
-    }
+    const newProblemId = await saveProblem(formData.title, formData.description, formData.username, reproData);
 
-    toast.info('Submitting problem...');
-
-    const repositoryId = workbenchStore.repositoryId.get();
-
-    if (!repositoryId) {
-      toast.error('No repository ID found');
-      return;
-    }
-
-    const repositoryContents = await getRepositoryContents(repositoryId);
-
-    const problem: BoltProblemInput = {
-      version: 2,
-      title: formData.title,
-      description: formData.description,
-      username: shouldUseSupabase() ? (undefined as any) : formData.username,
-      user_id: shouldUseSupabase() ? (await getCurrentUser())?.id || '' : undefined,
-      repositoryContents,
-      status: BoltProblemStatus.Pending,
-    };
-
-    const problemId = await submitProblem(problem);
-
-    if (problemId) {
-      setProblemId(problemId);
-      localStorage.setItem('loadedProblemId', problemId);
+    if (newProblemId) {
+      setProblemId(newProblemId);
     }
   };
 

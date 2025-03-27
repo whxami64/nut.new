@@ -12,7 +12,6 @@ import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { SaveProblem } from './SaveProblem';
-import { SaveReproductionModal } from './SaveReproduction';
 import { useAdminStatus } from '~/lib/stores/user';
 
 const menuVariants = {
@@ -140,8 +139,7 @@ export const Menu = () => {
           >
             Problems
           </a>
-          <SaveProblem />
-          {isAdmin && <SaveReproductionModal />}
+          {isAdmin && <SaveProblem />}
           <a
             href="/about"
             className="flex gap-2 bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"
