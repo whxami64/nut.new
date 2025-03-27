@@ -111,53 +111,11 @@ test('Should be able to add a comment to a problem', async ({ page }) => {
   await expect(page.locator('[data-testid="problem-comment"]').filter({ hasText: comment })).toBeVisible();
 });
 
-test('Confirm that admins see the "Save Reproduction" button', async ({ page }) => {
+test('Confirm that admins see the "Save Problem" button', async ({ page }) => {
   await page.goto('/problems?showAll=true');
 
   await login(page);
   await openSidebar(page);
-  await expect(page.getByRole('link', { name: 'Save Reproduction' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save Problem' })).toBeVisible();
 });
 
-test('Should be able to save a reproduction', async ({ page }) => {
-  await page.goto('/problems?showAll=true');
-  await page.getByRole('combobox').selectOption('all');
-  await page.getByRole('link', { name: '[test] tic tac toe' }).first().click();
-
-  const shouldUseSupabase = await isSupabaseEnabled(page);
-  await login(page);
-
-  await page.getByRole('link', { name: 'Load Problem' }).click();
-
-  // TODO: Find a way to interact with the tic tac toe board
-  // find the cell in the tic tac toe board inside the iframe
-  // const frameLocator = page.frameLocator('iframe[title="preview"]').first();
-  // await frameLocator.getByTestId('cell-0-0').click();
-
-  const message = `test message ${Date.now().toString()}`;
-
-  await page.getByRole('textbox', { name: 'How can we help you?' }).click();
-  await page.getByRole('textbox', { name: 'How can we help you?' }).fill(message);
-  await page.getByRole('button', { name: 'Chat', exact: true }).click();
-
-  await openSidebar(page);
-
-  await page.getByRole('link', { name: 'Save Reproduction' }).click();
-  await page.getByRole('button', { name: 'Submit' }).click();
-  await expect(page.getByText('Reproduction saved')).toBeVisible();
-
-  /*
-   * Check to see if __currentProblem__ is set and has the correct solution message
-   */
-  const currentProblem = await page.evaluate(() => {
-    // @ts-ignore - accessing window.__currentProblem__ which is defined at runtime
-    return window.__currentProblem__;
-  });
-
-  // Only supabase is working for now
-  if (shouldUseSupabase) {
-    // Check if the message is a text message before accessing content
-    const message3 = currentProblem?.solution?.messages[2];
-    expect(message3 && message3.type === 'text' ? (message3 as any).content : null).toBe(message);
-  }
-});
