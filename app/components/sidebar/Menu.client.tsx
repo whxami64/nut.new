@@ -12,8 +12,7 @@ import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { SaveProblem } from './SaveProblem';
-import { authStatusStore } from '~/lib/stores/auth';
-import { useStore } from '@nanostores/react';
+import { useAdminStatus } from '~/lib/stores/user';
 
 const menuVariants = {
   closed: {
@@ -46,7 +45,7 @@ export const Menu = () => {
   const [open, setOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const isLoggedIn = useStore(authStatusStore.isLoggedIn);
+  const { isAdmin } = useAdminStatus();
 
   const { filteredItems: filteredList, handleSearchChange } = useSearchFilter({
     items: list,
@@ -140,7 +139,7 @@ export const Menu = () => {
           >
             Problems
           </a>
-          {isLoggedIn && <SaveProblem />}
+          {isAdmin && <SaveProblem />}
           <a
             href="/about"
             className="flex gap-2 bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"
