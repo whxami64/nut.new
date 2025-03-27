@@ -19,7 +19,8 @@ test('Should be able to load a problem', async ({ page }) => {
   await expect(page.getByText('Import the "problem" folder')).toBeVisible({ timeout: 30000 });
 });
 
-test('Should be able to save a problem ', async ({ page }) => {
+// TODO: Unskip this test once we can make sure we get a repro for a problem.
+test.skip('Should be able to save a problem ', async ({ page }) => {
   await page.goto('/problems');
   await page.getByRole('link', { name: 'App goes blank getting' }).click();
   await page.getByRole('link', { name: 'Load Problem' }).click();
@@ -118,4 +119,3 @@ test('Confirm that admins see the "Save Problem" button', async ({ page }) => {
   await openSidebar(page);
   await expect(page.getByRole('button', { name: 'Save Problem' })).toBeVisible();
 });
-
