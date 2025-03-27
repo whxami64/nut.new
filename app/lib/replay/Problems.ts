@@ -1,7 +1,7 @@
 // Accessors for the API to access saved problems.
 
 import { toast } from 'react-toastify';
-import { sendCommandDedicatedClient } from './ReplayProtocolClient';
+import { assert, sendCommandDedicatedClient } from './ReplayProtocolClient';
 import type { Message } from '~/lib/persistence/message';
 import Cookies from 'js-cookie';
 import { shouldUseSupabase } from '~/lib/supabase/client';
@@ -61,7 +61,7 @@ export interface BoltProblemDescription {
 export interface BoltProblem extends BoltProblemDescription {
   username?: string;
   user_id?: string;
-  repositoryContents: string;
+  repositoryId: string;
   comments?: BoltProblemComment[];
   solution?: BoltProblemSolution;
 }
@@ -133,11 +133,7 @@ export async function getProblem(problemId: string): Promise<BoltProblem | null>
         return null;
       }
 
-      if ('prompt' in problem) {
-        // 2/11/2025: Update obsolete data format for older problems.
-        problem.repositoryContents = (problem as any).prompt.content;
-        delete problem.prompt;
-      }
+      assert(problem.repositoryId, 'Problem probably has outdated data format. Must have a repositoryId.');
     } catch (error) {
       console.error('Error fetching problem', error);
 

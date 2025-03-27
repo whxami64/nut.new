@@ -7,6 +7,7 @@
   "type": "module",
   "version": "0.0.5",
   "scripts": {
+    "checks": "pnpm run typecheck && pnpm run lint:fix",
     "deploy": "vercel deploy --prod",
     "build": "npx remix vite:build",
     "dev": "node pre-start.cjs && npx remix vite:dev",

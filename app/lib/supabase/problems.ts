@@ -84,17 +84,11 @@ export async function supabaseGetProblem(problemId: string): Promise<BoltProblem
     }
 
     // Fetch blob data from storage if paths are available
-    let repositoryContents = data.repository_contents;
     let solution = data.solution;
     const prompt = data.prompt;
 
     // Create a supabase instance for storage operations
     const supabase = getSupabase();
-
-    // Fetch repository contents from storage if path is available
-    if (data.repository_contents_path) {
-      repositoryContents = (await downloadBlob('repository-contents', data.repository_contents_path)) || '';
-    }
 
     if (data.solution_path) {
       solution = JSON.parse((await downloadBlob('solutions', data.solution_path)) || '{}');
@@ -123,7 +117,7 @@ export async function supabaseGetProblem(problemId: string): Promise<BoltProblem
       description: data.description,
       status: data.status as BoltProblemStatus,
       keywords: data.keywords,
-      repositoryContents,
+      repositoryId: data.repository_id,
       username,
       solution: solution || prompt,
       comments: data.problem_comments.map((comment: any) => ({
@@ -154,7 +148,7 @@ export async function supabaseSubmitProblem(problem: BoltProblemInput): Promise<
       description: problem.description,
       status: problem.status as BoltProblemStatus,
       keywords: problem.keywords || [],
-      repository_contents: problem.repositoryContents,
+      repository_id: problem.repositoryId,
       user_id: problem.user_id,
     };
 
@@ -202,7 +196,7 @@ export async function supabaseUpdateProblem(problemId: string, problem: BoltProb
       description: problem.description,
       status: problem.status,
       keywords: problem.keywords || [],
-      repository_contents_path: problem.repositoryContents ? `problems/${problemId}.txt` : undefined,
+      repository_id: problem.repositoryId,
       solution_path: problem.solution ? `solutions/${problemId}.json` : undefined,
     };
 
@@ -211,17 +205,6 @@ export async function supabaseUpdateProblem(problemId: string, problem: BoltProb
 
     if (updateError) {
       throw updateError;
-    }
-
-    if (updates.repository_contents_path) {
-      const { error: repositoryContentsError } = await getSupabase()
-        .storage.from('repository-contents')
-        .upload(updates.repository_contents_path, problem.repositoryContents);
-
-      // @ts-ignore - ignore duplicate error
-      if (repositoryContentsError && repositoryContentsError.error !== 'Duplicate') {
-        throw repositoryContentsError;
-      }
     }
 
     if (updates.solution_path) {

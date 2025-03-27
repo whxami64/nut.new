@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { submitProblem, BoltProblemStatus } from '~/lib/replay/Problems';
 import type { BoltProblemInput } from '~/lib/replay/Problems';
-import { getRepositoryContents } from '~/lib/replay/Repository';
 import { shouldUseSupabase, getCurrentUser } from '~/lib/supabase/client';
 import { authModalStore } from '~/lib/stores/authModal';
 import { authStatusStore } from '~/lib/stores/auth';
@@ -72,15 +71,13 @@ export function SaveProblem() {
       return;
     }
 
-    const repositoryContents = await getRepositoryContents(repositoryId);
-
     const problem: BoltProblemInput = {
       version: 2,
       title: formData.title,
       description: formData.description,
       username: shouldUseSupabase() ? (undefined as any) : formData.username,
       user_id: shouldUseSupabase() ? (await getCurrentUser())?.id || '' : undefined,
-      repositoryContents,
+      repositoryId,
       status: BoltProblemStatus.Pending,
     };
 
