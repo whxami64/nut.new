@@ -12,8 +12,7 @@ import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { SaveProblem } from './SaveProblem';
-import { useAdminStatus } from '~/lib/stores/user';
-import { authStatusStore } from '../../lib/stores/auth';
+import { authStatusStore } from '~/lib/stores/auth';
 import { useStore } from '@nanostores/react';
 
 const menuVariants = {

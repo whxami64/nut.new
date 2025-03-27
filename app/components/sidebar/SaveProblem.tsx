@@ -95,6 +95,7 @@ function getReproductionData(): any | null {
   } catch (error: any) {
     console.error('Error getting reproduction data', error?.stack || error);
     toast.error(`Error getting reproduction data: ${error?.message}`);
+
     return null;
   }
 }
@@ -125,6 +126,7 @@ export function SaveProblem() {
     e.stopPropagation();
 
     const currentReproData = getReproductionData();
+
     if (!currentReproData) {
       return;
     }
@@ -153,6 +155,7 @@ export function SaveProblem() {
     }
 
     const newProblemId = await saveProblem(formData.title, formData.description, formData.username, reproData);
+
     if (newProblemId) {
       setProblemId(newProblemId);
     }
