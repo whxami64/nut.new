@@ -7,14 +7,13 @@ import { useAnimate } from 'framer-motion';
 import { memo, useEffect, useRef, useState } from 'react';
 import { cssTransition, toast, ToastContainer } from 'react-toastify';
 import { useSnapScroll } from '~/lib/hooks';
-import { useChatHistory } from '~/lib/persistence';
+import { currentChatId, handleChatTitleUpdate, useChatHistory } from '~/lib/persistence';
 import { chatStore } from '~/lib/stores/chat';
 import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
 import { BaseChat } from './BaseChat';
 import Cookies from 'js-cookie';
 import { useSearchParams } from '@remix-run/react';
-import { createSampler } from '~/utils/sampler';
 import {
   simulationAddData,
   simulationFinishData,
@@ -33,6 +32,7 @@ import type { RejectChangeData } from './ApproveChange';
 import { assert, generateRandomId } from '~/lib/replay/ReplayProtocolClient';
 import { getMessagesRepositoryId, getPreviousRepositoryId, type Message } from '~/lib/persistence/message';
 import { useAuthStatus } from '~/lib/stores/auth';
+import { debounce } from '~/utils/debounce';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -111,24 +111,9 @@ export function Chat() {
   );
 }
 
-const processSampledMessages = createSampler(
-  (options: {
-    messages: Message[];
-    initialMessages: Message[];
-    storeMessageHistory: (messages: Message[]) => Promise<void>;
-  }) => {
-    const { messages, initialMessages, storeMessageHistory } = options;
-
-    if (messages.length > initialMessages.length) {
-      storeMessageHistory(messages).catch((error) => toast.error(error.message));
-    }
-  },
-  50,
-);
-
 interface ChatProps {
   initialMessages: Message[];
-  storeMessageHistory: (messages: Message[]) => Promise<void>;
+  storeMessageHistory: (messages: Message[]) => void;
   importChat: (description: string, messages: Message[]) => Promise<void>;
 }
 
@@ -156,8 +141,10 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
    * This is set when the user has triggered a chat message and the response hasn't finished
    * being generated.
    */
-  const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
-  const isLoading = activeChatId !== undefined;
+  const [pendingMessageId, setPendingMessageId] = useState<string | undefined>(undefined);
+
+  // Last status we heard for the pending message.
+  const [pendingMessageStatus, setPendingMessageStatus] = useState('');
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
 
@@ -190,18 +177,14 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
   }, []);
 
   useEffect(() => {
-    processSampledMessages({
-      messages,
-      initialMessages,
-      storeMessageHistory,
-    });
-  }, [messages, isLoading]);
+    storeMessageHistory(messages);
+  }, [messages]);
 
   const abort = () => {
     stop();
     gNumAborts++;
     chatStore.setKey('aborted', true);
-    setActiveChatId(undefined);
+    setPendingMessageId(undefined);
 
     if (gActiveChatMessageTelemetry) {
       gActiveChatMessageTelemetry.abort('StopButtonClicked');
@@ -242,7 +225,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
     const _input = messageInput || input;
     const numAbortsAtStart = gNumAborts;
 
-    if (_input.length === 0 || isLoading) {
+    if (_input.length === 0 || pendingMessageId) {
       return;
     }
 
@@ -262,7 +245,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
     }
 
     const chatId = generateRandomId();
-    setActiveChatId(chatId);
+    setPendingMessageId(chatId);
 
     const userMessage: Message = {
       id: `user-${chatId}`,
@@ -331,6 +314,16 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
       }
     };
 
+    const onChatTitle = (title: string) => {
+      console.log('ChatTitle', title);
+      handleChatTitleUpdate(currentChatId.get() as string, title);
+    };
+
+    const onChatStatus = debounce((status: string) => {
+      console.log('ChatStatus', status);
+      setPendingMessageStatus(status);
+    }, 500);
+
     const references: ChatReference[] = [];
 
     const mouseData = getCurrentMouseData();
@@ -347,7 +340,11 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
     }
 
     try {
-      await sendChatMessage(newMessages, references, addResponseMessage);
+      await sendChatMessage(newMessages, references, {
+        onResponsePart: addResponseMessage,
+        onTitle: onChatTitle,
+        onStatus: onChatStatus,
+      });
     } catch (e) {
       toast.error('Error sending message');
       console.error('Error sending message', e);
@@ -360,7 +357,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
     gActiveChatMessageTelemetry.finish();
     clearActiveChat();
 
-    setActiveChatId(undefined);
+    setPendingMessageId(undefined);
 
     setInput('');
 
@@ -493,7 +490,8 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory, importChat
       input={input}
       showChat={showChat}
       chatStarted={chatStarted}
-      isStreaming={isLoading}
+      hasPendingMessage={pendingMessageId !== undefined}
+      pendingMessageStatus={pendingMessageStatus}
       sendMessage={sendMessage}
       messageRef={messageRef}
       scrollRef={scrollRef}

@@ -1,25 +1,26 @@
-import { useLoaderData, useNavigate } from '@remix-run/react';
+import { useLoaderData } from '@remix-run/react';
 import { useState, useEffect } from 'react';
 import { atom } from 'nanostores';
 import { toast } from 'react-toastify';
 import { logStore } from '~/lib/stores/logs'; // Import logStore
-import { createChat, getChatContents, setChatContents } from './db';
+import { createChat, getChatContents, setChatContents, getChatPublicData, databaseUpdateChatTitle } from './db';
 import { loadProblem } from '~/components/chat/LoadProblemButton';
-import type { Message } from './message';
+import { createMessagesForRepository, type Message } from './message';
+import { debounce } from '~/utils/debounce';
 
+// These must be kept in sync.
 export const currentChatId = atom<string | undefined>(undefined);
 export const currentChatTitle = atom<string | undefined>(undefined);
 
 export function useChatHistory() {
-  const navigate = useNavigate();
   const { id: mixedId, problemId } = useLoaderData<{ id?: string; problemId?: string }>() ?? {};
 
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [ready, setReady] = useState<boolean>(!mixedId && !problemId);
 
-  const importChat = async (description: string, messages: Message[]) => {
+  const importChat = async (title: string, messages: Message[]) => {
     try {
-      const newId = await createChat(description, messages);
+      const newId = await createChat(title, messages);
       window.location.href = `/chat/${newId}`;
       toast.success('Chat imported successfully');
     } catch (error) {
@@ -32,46 +33,49 @@ export function useChatHistory() {
   };
 
   useEffect(() => {
-    if (mixedId) {
-      getChatContents(mixedId)
-        .then((chatContents) => {
-          if (chatContents && chatContents.messages.length > 0) {
+    (async () => {
+      try {
+        if (mixedId) {
+          const chatContents = await getChatContents(mixedId);
+          if (chatContents) {
             setInitialMessages(chatContents.messages);
             currentChatTitle.set(chatContents.title);
             currentChatId.set(mixedId);
-          } else {
-            navigate('/', { replace: true });
+            setReady(true);
+            return;
           }
 
+          const publicData = await getChatPublicData(mixedId);
+          const messages = createMessagesForRepository(publicData.title, publicData.repositoryId);
+          await importChat(publicData.title, messages);
+        } else if (problemId) {
+          await loadProblem(problemId, importChat);
           setReady(true);
-        })
-        .catch((error) => {
-          logStore.logError('Failed to load chat messages', error);
-          toast.error(error.message);
-        });
-    } else if (problemId) {
-      loadProblem(problemId, importChat).then(() => setReady(true));
-    }
+        }
+      } catch (error) {
+        logStore.logError('Failed to load chat messages', error);
+        toast.error((error as any).message);
+      }
+    })();
   }, []);
 
   return {
     ready,
     initialMessages,
-    storeMessageHistory: async (messages: Message[]) => {
+    storeMessageHistory: debounce(async (messages: Message[]) => {
       if (messages.length === 0) {
         return;
       }
 
-      const title = currentChatTitle.get() ?? 'New Chat';
-
       if (!currentChatId.get()) {
-        const id = await createChat(title, initialMessages);
+        const id = await createChat('New Chat', initialMessages);
         currentChatId.set(id);
+        currentChatTitle.set('New Chat');
         navigateChat(id);
       }
 
-      await setChatContents(currentChatId.get() as string, title, messages);
-    },
+      await setChatContents(currentChatId.get() as string, currentChatTitle.get() as string, messages);
+    }, 1000),
     importChat,
   };
 }
@@ -86,4 +90,11 @@ function navigateChat(nextId: string) {
   url.pathname = `/chat/${nextId}`;
 
   window.history.replaceState({}, '', url);
+}
+
+export async function handleChatTitleUpdate(id: string, title: string) {
+  await databaseUpdateChatTitle(id, title);
+  if (currentChatId.get() == id) {
+    currentChatTitle.set(title);
+  }
 }

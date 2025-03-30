@@ -77,6 +77,11 @@ export async function getCurrentUser(): Promise<SupabaseUser | null> {
   }
 }
 
+export async function getCurrentUserId(): Promise<string | null> {
+  const user = await getCurrentUser();
+  return user?.id || null;
+}
+
 export async function getNutIsAdmin(): Promise<boolean> {
   const user = await getCurrentUser();
 
@@ -137,8 +142,3 @@ export function getSupabase() {
 
   return supabaseClientInstance;
 }
-
-// Helper function to check if Supabase is properly initialized
-export const isSupabaseInitialized = (): boolean => {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-};
