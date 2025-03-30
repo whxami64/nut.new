@@ -6,6 +6,7 @@ import { getSupabase, getCurrentUserId } from '~/lib/supabase/client';
 import { v4 as uuid } from 'uuid';
 import { getMessagesRepositoryId, type Message } from './message';
 import { assert } from '~/lib/replay/ReplayProtocolClient';
+import type { DeploySettingsDatabase } from '../replay/Deploy';
 
 export interface ChatContents {
   id: string;
@@ -52,7 +53,7 @@ export async function getAllChats(): Promise<ChatContents[]> {
     return getLocalChats();
   }
 
-  const { data, error } = await getSupabase().from('chats').select('*');
+  const { data, error } = await getSupabase().from('chats').select('*').eq('deleted', false);
 
   if (error) {
     throw error;
@@ -66,10 +67,16 @@ export async function syncLocalChats(): Promise<void> {
   const localChats = getLocalChats();
 
   if (userId && localChats.length) {
-    for (const chat of localChats) {
-      await setChatContents(chat.id, chat.title, chat.messages);
+    try {
+      for (const chat of localChats) {
+        if (chat.title) {
+          await setChatContents(chat.id, chat.title, chat.messages);
+        }
+      }
+      setLocalChats(undefined);
+    } catch (error) {
+      console.error('Error syncing local chats', error);
     }
-    setLocalChats(undefined);
   }
 }
 
@@ -151,7 +158,7 @@ export async function deleteById(id: string): Promise<void> {
     return;
   }
 
-  const { error } = await getSupabase().from('chats').delete().eq('id', id);
+  const { error } = await getSupabase().from('chats').update({ deleted: true }).eq('id', id);
 
   if (error) {
     throw error;
@@ -173,4 +180,26 @@ export async function databaseUpdateChatTitle(id: string, title: string): Promis
   }
 
   await setChatContents(id, title, chat.messages);
+}
+
+export async function databaseGetChatDeploySettings(id: string): Promise<DeploySettingsDatabase | undefined> {
+  const { data, error } = await getSupabase().from('chats').select('deploy_settings').eq('id', id);
+
+  if (error) {
+    throw error;
+  }
+
+  if (data.length != 1) {
+    return undefined;
+  }
+
+  return data[0].deploy_settings;
+}
+
+export async function databaseUpdateChatDeploySettings(id: string, deploySettings: DeploySettingsDatabase): Promise<void> {
+  const { error } = await getSupabase().from('chats').update({ deploy_settings: deploySettings }).eq('id', id);
+
+  if (error) {
+    throw error;
+  }
 }
