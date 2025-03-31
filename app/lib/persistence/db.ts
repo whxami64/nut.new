@@ -183,7 +183,11 @@ export async function databaseUpdateChatTitle(id: string, title: string): Promis
 }
 
 export async function databaseGetChatDeploySettings(id: string): Promise<DeploySettingsDatabase | undefined> {
+  console.log('DatabaseGetChatDeploySettingsStart', id);
+
   const { data, error } = await getSupabase().from('chats').select('deploy_settings').eq('id', id);
+
+  console.log('DatabaseGetChatDeploySettingsDone', id, data, error);
 
   if (error) {
     throw error;

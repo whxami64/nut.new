@@ -173,7 +173,7 @@ export function DeployChatButton() {
               <>
                 <h2 className="text-xl font-semibold text-center mb-4">Deploy</h2>
                 <div className="text-center mb-4">
-                  Deploy this chat's project to production.
+                  Deploy this chat's app to production.
                 </div>
 
                 {deploySettings?.siteURL && (
