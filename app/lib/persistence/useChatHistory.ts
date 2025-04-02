@@ -1,16 +1,17 @@
 import { useLoaderData } from '@remix-run/react';
 import { useState, useEffect } from 'react';
-import { atom } from 'nanostores';
 import { toast } from 'react-toastify';
 import { logStore } from '~/lib/stores/logs'; // Import logStore
-import { createChat, getChatContents, setChatContents, getChatPublicData, databaseUpdateChatTitle } from './db';
+import { chatStore } from '~/lib/stores/chat';
+import { database } from './db';
 import { loadProblem } from '~/components/chat/LoadProblemButton';
 import { createMessagesForRepository, type Message } from './message';
 import { debounce } from '~/utils/debounce';
 
-// These must be kept in sync.
-export const currentChatId = atom<string | undefined>(undefined);
-export const currentChatTitle = atom<string | undefined>(undefined);
+export interface ResumeChatInfo {
+  protocolChatId: string;
+  protocolChatResponseId: string;
+}
 
 export function useChatHistory() {
   const {
@@ -20,11 +21,12 @@ export function useChatHistory() {
   } = useLoaderData<{ id?: string; problemId?: string; repositoryId?: string }>() ?? {};
 
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
+  const [resumeChat, setResumeChat] = useState<ResumeChatInfo | undefined>(undefined);
   const [ready, setReady] = useState<boolean>(!mixedId && !problemId && !repositoryId);
 
   const importChat = async (title: string, messages: Message[]) => {
     try {
-      const newId = await createChat(title, messages);
+      const newId = await database.createChat(title, messages);
       window.location.href = `/chat/${newId}`;
       toast.success('Chat imported successfully');
     } catch (error) {
@@ -43,23 +45,32 @@ export function useChatHistory() {
   };
 
   const debouncedSetChatContents = debounce(async (messages: Message[]) => {
-    await setChatContents(currentChatId.get() as string, currentChatTitle.get() as string, messages);
+    const chat = chatStore.currentChat.get();
+    if (!chat) {
+      return;
+    }
+    await database.setChatContents({ ...chat, messages });
   }, 1000);
 
   useEffect(() => {
     (async () => {
       try {
         if (mixedId) {
-          const chatContents = await getChatContents(mixedId);
+          const chatContents = await database.getChatContents(mixedId);
           if (chatContents) {
             setInitialMessages(chatContents.messages);
-            currentChatTitle.set(chatContents.title);
-            currentChatId.set(mixedId);
+            chatStore.currentChat.set(chatContents);
+            if (chatContents.lastProtocolChatId && chatContents.lastProtocolChatResponseId) {
+              setResumeChat({
+                protocolChatId: chatContents.lastProtocolChatId,
+                protocolChatResponseId: chatContents.lastProtocolChatResponseId,
+              });
+            }
             setReady(true);
             return;
           }
 
-          const publicData = await getChatPublicData(mixedId);
+          const publicData = await database.getChatPublicData(mixedId);
           const messages = createMessagesForRepository(publicData.title, publicData.repositoryId);
           await importChat(publicData.title, messages);
         } else if (problemId) {
@@ -79,16 +90,17 @@ export function useChatHistory() {
   return {
     ready,
     initialMessages,
+    resumeChat,
     storeMessageHistory: async (messages: Message[]) => {
       if (messages.length === 0) {
         return;
       }
 
-      if (!currentChatId.get()) {
-        const id = await createChat('New Chat', initialMessages);
-        currentChatId.set(id);
-        currentChatTitle.set('New Chat');
-        navigateChat(id);
+      if (!chatStore.currentChat.get()) {
+        const title = 'New Chat';
+        const chat = await database.createChat(title, initialMessages);
+        chatStore.currentChat.set(chat);
+        navigateChat(chat.id);
       }
 
       debouncedSetChatContents(messages);
@@ -110,8 +122,9 @@ function navigateChat(nextId: string) {
 }
 
 export async function handleChatTitleUpdate(id: string, title: string) {
-  await databaseUpdateChatTitle(id, title);
-  if (currentChatId.get() == id) {
-    currentChatTitle.set(title);
+  await database.updateChatTitle(id, title);
+  const currentChat = chatStore.currentChat.get();
+  if (currentChat?.id == id) {
+    chatStore.currentChat.set({ ...currentChat, title });
   }
 }

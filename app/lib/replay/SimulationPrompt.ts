@@ -8,6 +8,9 @@ import { simulationDataVersion } from './SimulationData';
 import { assert, generateRandomId, ProtocolClient } from './ReplayProtocolClient';
 import { updateDevelopmentServer } from './DevelopmentServer';
 import type { Message } from '~/lib/persistence/message';
+import { database } from '~/lib/persistence/db';
+import { chatStore } from '~/lib/stores/chat';
+import { debounce } from '~/utils/debounce';
 
 function createRepositoryIdPacket(repositoryId: string): SimulationPacket {
   return {
@@ -28,7 +31,7 @@ interface ChatReferenceElement {
 
 export type ChatReference = ChatReferenceElement;
 
-interface ChatMessageCallbacks {
+export interface ChatMessageCallbacks {
   onResponsePart: (message: Message) => void;
   onTitle: (title: string) => void;
   onStatus: (status: string) => void;
@@ -183,6 +186,10 @@ class ChatManager {
 
     console.log('ChatSendMessage', new Date().toISOString(), chatId, JSON.stringify({ messages, references }));
 
+    const id = chatStore.currentChat.get()?.id;
+    assert(id, 'Expected chat ID');
+    database.updateChatLastMessage(id, chatId, responseId);
+
     await this.client.sendCommand({
       method: 'Nut.sendChatMessage',
       params: { chatId, responseId, messages, references },
@@ -228,10 +235,10 @@ function startChat(repositoryId: string | undefined, pageData: SimulationData) {
  * Called when the repository has changed. We'll start a new chat
  * and update the remote development server.
  */
-export function simulationRepositoryUpdated(repositoryId: string) {
+export const simulationRepositoryUpdated = debounce((repositoryId: string) => {
   startChat(repositoryId, []);
   updateDevelopmentServer(repositoryId);
-}
+}, 500);
 
 /*
  * Called when the page gathering interaction data has been reloaded. We'll
@@ -302,4 +309,37 @@ export async function sendChatMessage(
   gLastSimulationChatReferences = references;
 
   await gChatManager.sendChatMessage(messages, references, callbacks);
+}
+
+export async function resumeChatMessage(chatId: string, chatResponseId: string, callbacks: ChatMessageCallbacks) {
+  const client = new ProtocolClient();
+  await client.initialize();
+
+  try {
+    const removeResponseListener = client.listenForMessage(
+      'Nut.chatResponsePart',
+      ({ message }: { message: Message }) => {
+        callbacks.onResponsePart(message);
+      },
+    );
+
+    const removeTitleListener = client.listenForMessage('Nut.chatTitle', ({ title }: { title: string }) => {
+      callbacks.onTitle(title);
+    });
+
+    const removeStatusListener = client.listenForMessage('Nut.chatStatus', ({ status }: { status: string }) => {
+      callbacks.onStatus(status);
+    });
+
+    await client.sendCommand({
+      method: 'Nut.resumeChatMessage',
+      params: { chatId, responseId: chatResponseId },
+    });
+
+    removeResponseListener();
+    removeTitleListener();
+    removeStatusListener();
+  } finally {
+    client.close();
+  }
 }

@@ -1,7 +1,8 @@
-import { useStore } from '@nanostores/react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { currentChatId, currentChatTitle, getChatContents, handleChatTitleUpdate } from '~/lib/persistence';
+import { chatStore } from '~/lib/stores/chat';
+import { database } from '~/lib/persistence/db';
+import { handleChatTitleUpdate } from '~/lib/persistence/useChatHistory';
 
 interface EditChatDescriptionOptions {
   initialTitle?: string;
@@ -32,18 +33,19 @@ type EditChatDescriptionHook = {
  * @returns {EditChatDescriptionHook} Methods and state for managing description edits.
  */
 export function useEditChatTitle({
-  initialTitle = currentChatTitle.get()!,
+  initialTitle = chatStore.currentChat.get()?.title,
   customChatId,
 }: EditChatDescriptionOptions): EditChatDescriptionHook {
-  const chatIdFromStore = useStore(currentChatId);
+  const currentChat = chatStore.currentChat.get();
+
   const [editing, setEditing] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(initialTitle);
 
   const [chatId, setChatId] = useState<string>();
 
   useEffect(() => {
-    setChatId(customChatId || chatIdFromStore);
-  }, [customChatId, chatIdFromStore]);
+    setChatId(customChatId || currentChat?.id);
+  }, [customChatId, currentChat]);
   useEffect(() => {
     setCurrentTitle(initialTitle);
   }, [initialTitle]);
@@ -60,7 +62,7 @@ export function useEditChatTitle({
     }
 
     try {
-      const chat = await getChatContents(chatId);
+      const chat = await database.getChatContents(chatId);
       return chat?.title || initialTitle;
     } catch (error) {
       console.error('Failed to fetch latest description:', error);
@@ -104,6 +106,10 @@ export function useEditChatTitle({
     async (event: React.FormEvent) => {
       event.preventDefault();
 
+      if (!currentTitle) {
+        return;
+      }
+
       if (!isValidTitle(currentTitle)) {
         return;
       }
@@ -140,7 +146,7 @@ export function useEditChatTitle({
     handleBlur,
     handleSubmit,
     handleKeyDown,
-    currentTitle,
+    currentTitle: currentTitle!,
     toggleEditMode,
   };
 }

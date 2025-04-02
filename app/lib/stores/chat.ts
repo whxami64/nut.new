@@ -1,7 +1,12 @@
-import { map } from 'nanostores';
+import { atom } from 'nanostores';
+import type { ChatContents } from '~/lib/persistence/db';
 
-export const chatStore = map({
-  started: false,
-  aborted: false,
-  showChat: true,
-});
+export class ChatStore {
+  currentChat = atom<ChatContents | undefined>(undefined);
+
+  started = atom<boolean>(false);
+  aborted = atom<boolean>(false);
+  showChat = atom<boolean>(true);
+}
+
+export const chatStore = new ChatStore();

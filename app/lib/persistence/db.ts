@@ -15,6 +15,8 @@ export interface ChatContents {
   title: string;
   repositoryId: string | undefined;
   messages: Message[];
+  lastProtocolChatId: string | undefined;
+  lastProtocolChatResponseId: string | undefined;
 }
 
 function databaseRowToChatContents(d: any): ChatContents {
@@ -25,6 +27,8 @@ function databaseRowToChatContents(d: any): ChatContents {
     title: d.title,
     messages: d.messages,
     repositoryId: d.repository_id,
+    lastProtocolChatId: d.last_protocol_chat_id,
+    lastProtocolChatResponseId: d.last_protocol_chat_response_id,
   };
 }
 
@@ -46,7 +50,7 @@ function setLocalChats(chats: ChatContents[] | undefined): void {
   }
 }
 
-export async function getAllChats(): Promise<ChatContents[]> {
+async function getAllChats(): Promise<ChatContents[]> {
   const userId = await getCurrentUserId();
 
   if (!userId) {
@@ -62,7 +66,7 @@ export async function getAllChats(): Promise<ChatContents[]> {
   return data.map(databaseRowToChatContents);
 }
 
-export async function syncLocalChats(): Promise<void> {
+async function syncLocalChats(): Promise<void> {
   const userId = await getCurrentUserId();
   const localChats = getLocalChats();
 
@@ -70,7 +74,7 @@ export async function syncLocalChats(): Promise<void> {
     try {
       for (const chat of localChats) {
         if (chat.title) {
-          await setChatContents(chat.id, chat.title, chat.messages);
+          await setChatContents(chat);
         }
       }
       setLocalChats(undefined);
@@ -80,31 +84,29 @@ export async function syncLocalChats(): Promise<void> {
   }
 }
 
-export async function setChatContents(id: string, title: string, messages: Message[]): Promise<void> {
+async function setChatContents(chat: ChatContents) {
   const userId = await getCurrentUserId();
 
   if (!userId) {
-    const localChats = getLocalChats().filter((c) => c.id != id);
+    const localChats = getLocalChats().filter((c) => c.id != chat.id);
     localChats.push({
-      id,
-      title,
-      messages,
-      repositoryId: getMessagesRepositoryId(messages),
-      createdAt: new Date().toISOString(),
+      ...chat,
       updatedAt: new Date().toISOString(),
     });
     setLocalChats(localChats);
     return;
   }
 
-  const repositoryId = getMessagesRepositoryId(messages);
+  const repositoryId = getMessagesRepositoryId(chat.messages);
 
   const { error } = await getSupabase().from('chats').upsert({
-    id,
-    messages,
-    title,
+    id: chat.id,
+    messages: chat.messages,
+    title: chat.title,
     user_id: userId,
     repository_id: repositoryId,
+    last_protocol_chat_id: chat.lastProtocolChatId,
+    last_protocol_chat_response_id: chat.lastProtocolChatResponseId,
   });
 
   if (error) {
@@ -112,7 +114,7 @@ export async function setChatContents(id: string, title: string, messages: Messa
   }
 }
 
-export async function getChatPublicData(id: string): Promise<{ repositoryId: string; title: string }> {
+async function getChatPublicData(id: string): Promise<{ repositoryId: string; title: string }> {
   const { data, error } = await getSupabase().rpc('get_chat_public_data', { chat_id: id });
 
   if (error) {
@@ -129,7 +131,7 @@ export async function getChatPublicData(id: string): Promise<{ repositoryId: str
   };
 }
 
-export async function getChatContents(id: string): Promise<ChatContents | undefined> {
+async function getChatContents(id: string): Promise<ChatContents | undefined> {
   const userId = await getCurrentUserId();
 
   if (!userId) {
@@ -149,7 +151,7 @@ export async function getChatContents(id: string): Promise<ChatContents | undefi
   return databaseRowToChatContents(data[0]);
 }
 
-export async function deleteById(id: string): Promise<void> {
+async function deleteChat(id: string): Promise<void> {
   const userId = await getCurrentUserId();
 
   if (!userId) {
@@ -165,13 +167,21 @@ export async function deleteById(id: string): Promise<void> {
   }
 }
 
-export async function createChat(title: string, messages: Message[]): Promise<string> {
-  const id = uuid();
-  await setChatContents(id, title, messages);
-  return id;
+async function createChat(title: string, messages: Message[]): Promise<ChatContents> {
+  const contents = {
+    id: uuid(),
+    title,
+    messages,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    repositoryId: getMessagesRepositoryId(messages),
+    lastProtocolChatId: undefined,
+    lastProtocolChatResponseId: undefined,
+  };
+  await setChatContents(contents);
+  return contents;
 }
-
-export async function databaseUpdateChatTitle(id: string, title: string): Promise<void> {
+async function updateChatTitle(id: string, title: string): Promise<void> {
   const chat = await getChatContents(id);
   assert(chat, 'Unknown chat');
 
@@ -179,10 +189,10 @@ export async function databaseUpdateChatTitle(id: string, title: string): Promis
     throw new Error('Title cannot be empty');
   }
 
-  await setChatContents(id, title, chat.messages);
+  await setChatContents({ ...chat, title });
 }
 
-export async function databaseGetChatDeploySettings(id: string): Promise<DeploySettingsDatabase | undefined> {
+async function getChatDeploySettings(id: string): Promise<DeploySettingsDatabase | undefined> {
   console.log('DatabaseGetChatDeploySettingsStart', id);
 
   const { data, error } = await getSupabase().from('chats').select('deploy_settings').eq('id', id);
@@ -200,13 +210,39 @@ export async function databaseGetChatDeploySettings(id: string): Promise<DeployS
   return data[0].deploy_settings;
 }
 
-export async function databaseUpdateChatDeploySettings(
-  id: string,
-  deploySettings: DeploySettingsDatabase,
-): Promise<void> {
+async function updateChatDeploySettings(id: string, deploySettings: DeploySettingsDatabase): Promise<void> {
   const { error } = await getSupabase().from('chats').update({ deploy_settings: deploySettings }).eq('id', id);
 
   if (error) {
-    throw error;
+    console.error('DatabaseUpdateChatDeploySettingsError', id, deploySettings, error);
   }
 }
+
+async function updateChatLastMessage(
+  id: string,
+  protocolChatId: string | null,
+  protocolChatResponseId: string | null,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from('chats')
+    .update({ last_protocol_chat_id: protocolChatId, last_protocol_chat_response_id: protocolChatResponseId })
+    .eq('id', id);
+
+  if (error) {
+    console.error('DatabaseUpdateChatLastMessageError', id, protocolChatId, protocolChatResponseId, error);
+  }
+}
+
+export const database = {
+  getAllChats,
+  syncLocalChats,
+  setChatContents,
+  getChatPublicData,
+  getChatContents,
+  deleteChat,
+  createChat,
+  updateChatTitle,
+  getChatDeploySettings,
+  updateChatDeploySettings,
+  updateChatLastMessage,
+};
