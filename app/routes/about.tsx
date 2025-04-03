@@ -7,7 +7,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 function AboutPage() {
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1">
+      <div className="flex flex-col h-full min-h-screen w-full bg-bolt-elements-background-depth-1">
         <BackgroundRays />
         <Header />
         <ClientOnly>{() => <Menu />}</ClientOnly>
