@@ -9,7 +9,7 @@ import { IconButton } from '~/components/ui/IconButton';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
 import { Messages } from './Messages.client';
-import { getPreviousRepositoryId, type Message } from '~/lib/persistence/message';
+import { type Message } from '~/lib/persistence/message';
 import { SendButton } from './SendButton.client';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
@@ -20,7 +20,6 @@ import FilePreview from './FilePreview';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 import { ScreenshotStateManager } from './ScreenshotStateManager';
 import type { RejectChangeData } from './ApproveChange';
-import { assert } from '~/lib/replay/ReplayProtocolClient';
 import ApproveChange from './ApproveChange';
 
 export const TEXTAREA_MIN_HEIGHT = 76;
@@ -46,10 +45,8 @@ interface BaseChatProps {
   setUploadedFiles?: (files: File[]) => void;
   imageDataList?: string[];
   setImageDataList?: (dataList: string[]) => void;
-  onRewind?: (messageId: string) => void;
-  approveChangesMessageId?: string;
   onApproveChange?: (messageId: string) => void;
-  onRejectChange?: (lastMessageId: string, data: RejectChangeData) => void;
+  onRejectChange?: (messageId: string, data: RejectChangeData) => void;
 }
 
 export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
@@ -72,8 +69,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       imageDataList = [],
       setImageDataList,
       messages,
-      onRewind,
-      approveChangesMessageId,
       onApproveChange,
       onRejectChange,
     },
@@ -209,30 +204,21 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     };
 
-    const showApproveChange = (() => {
-      if (hasPendingMessage) {
-        return false;
+    const approveChangeMessageId = (() => {
+      if (hasPendingMessage || !messages) {
+        return undefined;
       }
 
-      if (!messages?.length) {
-        return false;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i];
+        if (message.repositoryId && message.peanuts) {
+          return message.approved ? undefined : message.id;
+        }
+        if (message.role == 'user') {
+          return undefined;
+        }
       }
-
-      const lastMessage = messages[messages.length - 1];
-
-      if (!lastMessage.repositoryId) {
-        return false;
-      }
-
-      if (!getPreviousRepositoryId(messages, messages.length - 1)) {
-        return false;
-      }
-
-      if (lastMessage.id != approveChangesMessageId) {
-        return false;
-      }
-
-      return true;
+      return undefined;
     })();
 
     let messageInput;
@@ -369,7 +355,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   Get what you want
                 </h1>
                 <p className="text-md lg:text-xl mb-8 text-bolt-elements-textSecondary animate-fade-in animation-delay-200">
-                  Build, test, and fix your app all from one prompt
+                  Write, test, and fix your app all from one prompt
                 </p>
               </div>
             )}
@@ -387,7 +373,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       messages={messages}
                       hasPendingMessage={hasPendingMessage}
                       pendingMessageStatus={pendingMessageStatus}
-                      onRewind={onRewind}
                     />
                   ) : null;
                 }}
@@ -444,24 +429,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                     />
                   )}
                 </ClientOnly>
-                {showApproveChange && (
+                {approveChangeMessageId && (
                   <ApproveChange
                     rejectFormOpen={rejectFormOpen}
                     setRejectFormOpen={setRejectFormOpen}
-                    onApprove={() => {
-                      if (onApproveChange && messages) {
-                        const lastMessage = messages[messages.length - 1];
-                        assert(lastMessage);
-                        onApproveChange(lastMessage.id);
-                      }
-                    }}
-                    onReject={(data) => {
-                      if (onRejectChange && messages) {
-                        const lastMessage = messages[messages.length - 1];
-                        assert(lastMessage);
-                        onRejectChange(lastMessage.id, data);
-                      }
-                    }}
+                    onApprove={() => onApproveChange?.(approveChangeMessageId)}
+                    onReject={(data) => onRejectChange?.(approveChangeMessageId, data)}
                   />
                 )}
                 {!rejectFormOpen && messageInput}
