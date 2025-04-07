@@ -20,9 +20,9 @@ import {
   simulationRepositoryUpdated,
   sendChatMessage,
   type ChatReference,
-  simulationReset,
+  abortChatMessage,
   resumeChatMessage,
-} from '~/lib/replay/SimulationPrompt';
+} from '~/lib/replay/ChatManager';
 import { getIFrameSimulationData } from '~/lib/replay/Recording';
 import { getCurrentIFrame } from '~/components/workbench/Preview';
 import { getCurrentMouseData } from '~/components/workbench/PointSelector';
@@ -166,7 +166,7 @@ export const ChatImpl = memo((props: ChatProps) => {
   const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]); // Move here
   const [imageDataList, setImageDataList] = useState<string[]>([]); // Move here
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { isLoggedIn } = useAuthStatus();
 
   // Input currently in the textarea.
@@ -235,7 +235,7 @@ export const ChatImpl = memo((props: ChatProps) => {
     if (gActiveChatMessageTelemetry) {
       gActiveChatMessageTelemetry.abort('StopButtonClicked');
       clearActiveChat();
-      simulationReset();
+      abortChatMessage();
     }
   };
 
@@ -325,8 +325,6 @@ export const ChatImpl = memo((props: ChatProps) => {
 
     runAnimation();
 
-    let updatedRepository = false;
-
     const addResponseMessage = (msg: Message) => {
       if (gNumAborts != numAbortsAtStart) {
         return;
@@ -342,7 +340,6 @@ export const ChatImpl = memo((props: ChatProps) => {
 
       if (responseRepositoryId && existingRepositoryId != responseRepositoryId) {
         simulationRepositoryUpdated(responseRepositoryId);
-        updatedRepository = true;
       }
     };
 
@@ -389,8 +386,10 @@ export const ChatImpl = memo((props: ChatProps) => {
         onStatus: onChatStatus,
       });
     } catch (e) {
-      toast.error('Error sending message');
-      console.error('Error sending message', e);
+      if (gNumAborts == numAbortsAtStart) {
+        toast.error('Error sending message');
+        console.error('Error sending message', e);
+      }
     }
 
     if (gNumAborts != numAbortsAtStart) {
@@ -405,10 +404,6 @@ export const ChatImpl = memo((props: ChatProps) => {
     setInput('');
 
     textareaRef.current?.blur();
-
-    if (!updatedRepository) {
-      simulationReset();
-    }
   };
 
   useEffect(() => {
