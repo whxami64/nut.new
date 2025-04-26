@@ -15,6 +15,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 
 import styles from './BaseChat.module.scss';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
+import { ExampleLibraryApps } from '~/components/app-library/ExampleLibraryApps';
 
 import FilePreview from './FilePreview';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
@@ -358,7 +359,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </div>
             )}
             <div
-              className={classNames('pt-6 px-2 sm:px-6', {
+              className={classNames('px-2 sm:px-6', {
                 'h-full flex flex-col': chatStarted,
               })}
             >
@@ -377,7 +378,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </ClientOnly>
               <div
                 className={classNames(
-                  'bg-bolt-elements-background-depth-2 p-3 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt mb-6',
+                  'bg-bolt-elements-background-depth-2 p-3 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
                   {
                     'sticky bottom-2': chatStarted,
                   },
@@ -438,15 +439,25 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 {!rejectFormOpen && messageInput}
               </div>
             </div>
-            {!chatStarted &&
-              ExamplePrompts((event, messageInput) => {
-                if (hasPendingMessage) {
-                  handleStop?.();
-                  return;
-                }
+            {!chatStarted && (
+              <>
+                {ExamplePrompts((event: React.UIEvent, messageInput?: string) => {
+                  if (hasPendingMessage) {
+                    handleStop?.();
+                    return;
+                  }
 
-                handleSendMessage?.(event, messageInput);
-              })}
+                  handleSendMessage?.(event, messageInput);
+                })}
+                <div className="text-2xl lg:text-4xl font-bold text-bolt-elements-textPrimary mt-8 mb-4 animate-fade-in text-center max-w-chat mx-auto">
+                  Library
+                </div>
+                <div className="text-bolt-elements-textSecondary text-center max-w-chat mx-auto">
+                  Browse these auto-generated apps for a place to start
+                </div>
+                <ExampleLibraryApps />
+              </>
+            )}
           </div>
           <ClientOnly>{() => <Workbench chatStarted={chatStarted} />}</ClientOnly>
         </div>

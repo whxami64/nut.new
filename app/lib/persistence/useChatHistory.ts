@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { logStore } from '~/lib/stores/logs'; // Import logStore
 import { chatStore } from '~/lib/stores/chat';
-import { database } from './db';
+import { database } from './chats';
 import { createMessagesForRepository, type Message } from './message';
 import { debounce } from '~/utils/debounce';
 
@@ -12,26 +12,26 @@ export interface ResumeChatInfo {
   protocolChatResponseId: string;
 }
 
+export async function importChat(title: string, messages: Message[]) {
+  try {
+    const chat = await database.createChat(title, messages);
+    window.location.href = `/chat/${chat.id}`;
+    toast.success('Chat imported successfully');
+  } catch (error) {
+    if (error instanceof Error) {
+      toast.error('Failed to import chat: ' + error.message);
+    } else {
+      toast.error('Failed to import chat');
+    }
+  }
+}
+
 export function useChatHistory() {
   const { id: mixedId, repositoryId } = useLoaderData<{ id?: string; repositoryId?: string }>() ?? {};
 
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [resumeChat, setResumeChat] = useState<ResumeChatInfo | undefined>(undefined);
   const [ready, setReady] = useState<boolean>(!mixedId && !repositoryId);
-
-  const importChat = async (title: string, messages: Message[]) => {
-    try {
-      const chat = await database.createChat(title, messages);
-      window.location.href = `/chat/${chat.id}`;
-      toast.success('Chat imported successfully');
-    } catch (error) {
-      if (error instanceof Error) {
-        toast.error('Failed to import chat: ' + error.message);
-      } else {
-        toast.error('Failed to import chat');
-      }
-    }
-  };
 
   const loadRepository = async (repositoryId: string) => {
     const messages = createMessagesForRepository(`Repository: ${repositoryId}`, repositoryId);
