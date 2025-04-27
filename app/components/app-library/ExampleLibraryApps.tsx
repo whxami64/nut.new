@@ -59,7 +59,7 @@ export const ExampleLibraryApps = () => {
       <div className={styles.grid}>
         {displayApps.map((app) => (
           <div
-            key={app.appId}
+            key={app.id}
             className={`${styles.appItem} ${!app.outcome.testsPassed ? styles.appItemError : ''}`}
             onClick={() => {
               importChat(

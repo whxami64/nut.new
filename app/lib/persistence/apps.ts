@@ -9,6 +9,7 @@ export interface BuildAppOutcome {
 }
 
 export interface BuildAppResult {
+  id: string;
   title: string | undefined;
   elapsedMinutes: number;
   totalPeanuts: number;
@@ -49,6 +50,7 @@ function databaseRowToBuildAppResult(row: any): BuildAppResult {
   const outcome = parseBuildAppOutcome(row.outcome);
 
   return {
+    id: row.id,
     title: row.title,
     elapsedMinutes: row.elapsed_minutes || 0,
     totalPeanuts: row.total_peanuts || 0,
