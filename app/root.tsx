@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { logStore } from './lib/stores/logs';
 import { initializeAuth, userStore, isLoadingStore } from './lib/stores/auth';
 import { initializeUserStores } from './lib/stores/user';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import { Analytics } from '@vercel/analytics/remix';
 import { AuthModal } from './components/auth/AuthModal';
 
@@ -115,6 +115,12 @@ function AuthProvider({ data }: { data: LoaderData }) {
       // Initialize auth and user stores
       initializeAuth().catch((err: Error) => {
         logStore.logError('Failed to initialize auth', err);
+        sentryHandleError(err);
+        toast.error('Could not log in to the server. Please reload the page, or close other open tabs and try again', {
+          autoClose: false,
+          position: 'top-center',
+          theme: 'colored',
+        });
       });
       initializeUserStores().catch((err: Error) => {
         logStore.logError('Failed to initialize user stores', err);
