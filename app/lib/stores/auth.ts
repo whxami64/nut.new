@@ -1,6 +1,6 @@
 import { atom } from 'nanostores';
 import { getSupabase } from '~/lib/supabase/client';
-import type { User, Session } from '@supabase/supabase-js';
+import { type User, type Session, AuthError } from '@supabase/supabase-js';
 import { logStore } from './logs';
 import { useEffect, useState } from 'react';
 import { isAuthenticated } from '~/lib/supabase/client';
@@ -32,18 +32,24 @@ export async function initializeAuth() {
 
     isLoadingStore.set(true);
 
-    // In local testing we've seen problems where Supabase auth hangs.
-    const timeout = setTimeout(() => {
-      console.error('Timed out initializing auth');
-    }, 5000);
+    // We've seen Supabase Auth hang when there are multiple tabs open.
+    // Handle this by using a timeout to ensure we don't wait indefinitely.
+    const timeoutPromise = new Promise<{ data: { session: Session | null }; error?: AuthError }>((resolve) => {
+      setTimeout(() => {
+        resolve({
+          data: { session: null },
+          error: new AuthError('Timed out initializing auth'),
+        });
+      }, 5000);
+    });
+
+    const authRes = await Promise.race([getSupabase().auth.getSession(), timeoutPromise]);
 
     // Get initial session
     const {
       data: { session },
       error,
-    } = await getSupabase().auth.getSession();
-
-    clearTimeout(timeout);
+    } = authRes;
 
     if (error) {
       throw error;
