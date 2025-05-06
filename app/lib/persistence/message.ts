@@ -9,6 +9,7 @@ interface MessageBase {
   role: MessageRole;
   repositoryId?: string;
   peanuts?: number;
+  category?: string;
 
   // Not part of the protocol, indicates whether the user has explicitly approved
   // the message. Once approved, the approve/reject UI is not shown again for the message.
@@ -66,4 +67,34 @@ export function createMessagesForRepository(title: string, repositoryId: string)
   const messages = [userMessage, filesMessage];
 
   return messages;
+}
+
+export enum PlaywrightTestStatus {
+  Pass = 'Pass',
+  Fail = 'Fail',
+  NotRun = 'NotRun',
+}
+
+export interface PlaywrightTestResult {
+  title: string;
+  status: PlaywrightTestStatus;
+  recordingId?: string;
+}
+
+export function parseTestResultsMessage(contents: string): PlaywrightTestResult[] {
+  const results: PlaywrightTestResult[] = [];
+  const lines = contents.split('\n');
+  for (const line of lines) {
+    const match = line.match(/TestResult (.*?) (.*?) (.*)/);
+    if (!match) {
+      continue;
+    }
+    const [status, recordingId, title] = match.slice(1);
+    results.push({
+      status: status as PlaywrightTestStatus,
+      title,
+      recordingId: recordingId == 'NoRecording' ? undefined : recordingId,
+    });
+  }
+  return results;
 }
