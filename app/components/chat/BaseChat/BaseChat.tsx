@@ -144,11 +144,11 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const baseChat = (
       <div
         ref={ref}
-        className={classNames(styles.BaseChat, 'relative flex h-full w-full overflow-hidden p-4')}
+        className={classNames(styles.BaseChat, 'relative flex h-full w-full overflow-hidden p-6')}
         data-chat-visible={showChat}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
-        <div ref={scrollRef} className="flex flex-col lg:flex-row overflow-y-auto w-full h-full">
+        <div ref={scrollRef} className="flex flex-col lg:flex-row w-full h-full">
           <div className={classNames(styles.Chat, 'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full')}>
             {!chatStarted && <IntroSection />}
             <div
@@ -161,7 +161,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   return chatStarted ? (
                     <Messages
                       ref={messageRef}
-                      className="flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1"
+                      className="flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto"
                       messages={messages}
                       hasPendingMessage={hasPendingMessage}
                       pendingMessageStatus={pendingMessageStatus}

@@ -38,7 +38,7 @@ export function Header() {
 
       <div className="flex-1 flex items-center ">
         {chatStarted && (
-          <span className="flex-1 px-4 truncate text-center text-bolt-elements-textPrimary">
+          <span className="px-4 truncate text-center text-bolt-elements-textPrimary">
             <ClientOnly>{() => <ChatDescription />}</ClientOnly>
           </span>
         )}
