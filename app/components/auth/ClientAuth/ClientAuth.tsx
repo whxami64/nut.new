@@ -1,0 +1,161 @@
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { getSupabase } from '~/lib/supabase/client';
+import type { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
+import { SignInForm } from './SignInForm';
+import { SignUpForm } from './SignUpForm';
+
+export function ClientAuth() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [usageData, setUsageData] = useState<{ peanuts_used: number; peanuts_refunded: number } | null>(null);
+
+  useEffect(() => {
+    async function getUser() {
+      try {
+        const { data } = await getSupabase().auth.getUser();
+        setUser(data.user);
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getUser();
+
+    const {
+      data: { subscription },
+    } = getSupabase().auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        setShowAuthModal(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    async function updateUsageData() {
+      try {
+        const { data, error } = await getSupabase()
+          .from('profiles')
+          .select('peanuts_used, peanuts_refunded')
+          .eq('id', user?.id)
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        setUsageData(data);
+      } catch (error) {
+        console.error('Error fetching usage data:', error);
+      }
+    }
+
+    if (showDropdown) {
+      updateUsageData();
+    }
+  }, [showDropdown]);
+
+  const handleSignOut = async () => {
+    await getSupabase().auth.signOut();
+    setShowDropdown(false);
+    toast.success('Signed out successfully');
+  };
+
+  if (loading) {
+    return <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse" />;
+  }
+
+  // Avatar URLs are disabled due to broken links from CORS issues.
+  const useAvatarURL = false;
+
+  return (
+    <>
+      {user ? (
+        <div className="relative">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500 text-white"
+            onClick={() => setShowDropdown(!showDropdown)}
+          >
+            {useAvatarURL && user.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt="User avatar"
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <span>{user.email?.substring(0, 2).toUpperCase()}</span>
+            )}
+          </button>
+
+          {showDropdown && (
+            <div className="absolute right-0 mt-2 py-2 w-64 bg-bolt-elements-background-depth-1 border border-bolt-elements-borderColor rounded-lg shadow-lg z-10">
+              <div className="px-4 py-3 text-bolt-elements-textPrimary border-b border-bolt-elements-borderColor">
+                <div className="text-sm text-bolt-elements-textSecondary">Signed in as</div>
+                <div className="font-medium truncate">{user.email}</div>
+              </div>
+              <div className="px-4 py-3 text-bolt-elements-textPrimary border-b border-bolt-elements-borderColor">
+                <div className="text-sm text-bolt-elements-textSecondary">Usage</div>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span>Peanuts used</span>
+                    <span className="font-medium">{usageData?.peanuts_used ?? '...'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Peanuts refunded</span>
+                    <span className="font-medium">{usageData?.peanuts_refunded ?? '...'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="px-2 pt-2">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full px-4 py-2 text-left bg-green-500 text-white hover:bg-red-50/10 rounded-md transition-colors flex items-center justify-center"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            setShowAuthModal(true);
+            setIsSignUp(false);
+          }}
+          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 font-bold"
+        >
+          Sign In
+        </button>
+      )}
+
+      {showAuthModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50"
+          onClick={() => setShowAuthModal(false)}
+        >
+          <div
+            className="bg-bolt-elements-background-depth-1 p-8 rounded-lg w-full max-w-md mx-auto border border-bolt-elements-borderColor"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isSignUp ? (
+              <SignUpForm onToggleForm={() => setIsSignUp(false)} />
+            ) : (
+              <SignInForm onToggleForm={() => setIsSignUp(true)} />
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
