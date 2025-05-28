@@ -16,12 +16,12 @@ interface MessageBase {
   approved?: boolean;
 }
 
-export interface MessageText extends MessageBase {
+interface MessageText extends MessageBase {
   type: 'text';
   content: string;
 }
 
-export interface MessageImage extends MessageBase {
+interface MessageImage extends MessageBase {
   type: 'image';
   dataURL: string;
 }
