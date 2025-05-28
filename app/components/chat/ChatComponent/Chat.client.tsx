@@ -3,7 +3,7 @@
  * Preventing TS checks with files presented in the video for a better presentation.
  */
 import { cssTransition, ToastContainer } from 'react-toastify';
-import {  useChatHistory } from '~/lib/persistence';
+import { useChatHistory } from '~/lib/persistence';
 import { renderLogger } from '~/utils/logger';
 import ChatImplementer from './components/ChatImplementer/ChatImplementer';
 import flushSimulationData from './functions/flushSimulation';
@@ -25,7 +25,11 @@ export function Chat() {
   return (
     <>
       {ready && (
-        <ChatImplementer initialMessages={initialMessages} resumeChat={resumeChat} storeMessageHistory={storeMessageHistory} />
+        <ChatImplementer
+          initialMessages={initialMessages}
+          resumeChat={resumeChat}
+          storeMessageHistory={storeMessageHistory}
+        />
       )}
       <ToastContainer
         closeButton={({ closeToast }) => {

@@ -2,8 +2,8 @@ import React from 'react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { IconButton } from '~/components/ui/IconButton';
 import { classNames } from '~/utils/classNames';
-import { SendButton } from '../SendButton.client';
-import { SpeechRecognitionButton } from '../SpeechRecognition';
+import { SendButton } from '~/components/chat/SendButton.client';
+import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 
 export interface MessageInputProps {
   textareaRef?: React.RefObject<HTMLTextAreaElement>;
@@ -203,4 +203,4 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       </div>
     </div>
   );
-}; 
+};

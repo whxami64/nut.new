@@ -7,18 +7,18 @@ import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
-import { Messages } from '../Messages.client';
+import { Messages } from '~/components/chat/Messages.client';
 import { type Message } from '~/lib/persistence/message';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { IntroSection } from './components/IntroSection/IntroSection';
-import { SearchInput } from '../SearchInput/SearchInput';
-import { ChatPromptContainer } from './components/ChatPromptContainer/ChatPromptContainer';
+import { IntroSection } from '~/components/chat/BaseChat/components/IntroSection/IntroSection';
+import { SearchInput } from '~/components/chat/SearchInput/SearchInput';
+import { ChatPromptContainer } from '~/components/chat/BaseChat/components/ChatPromptContainer/ChatPromptContainer';
 import { useSpeechRecognition } from '~/hooks/useSpeechRecognition';
 import styles from './BaseChat.module.scss';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import { ExampleLibraryApps } from '~/components/app-library/ExampleLibraryApps';
-import type { RejectChangeData } from '../ApproveChange';
-import { type MessageInputProps } from '../MessageInput/MessageInput';
+import type { RejectChangeData } from '~/components/chat/ApproveChange';
+import { type MessageInputProps } from '~/components/chat/MessageInput/MessageInput';
 
 export const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -47,7 +47,7 @@ type ExtendedMessage = Message & {
   repositoryId?: string;
   peanuts?: boolean;
   approved?: boolean;
-}
+};
 
 export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   (
@@ -75,17 +75,19 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [rejectFormOpen, setRejectFormOpen] = React.useState(false);
-    const [pendingFilterText, setPendingFilterText] = React.useState('');
     const [filterText, setFilterText] = React.useState('');
 
-    const onTranscriptChange = useCallback((transcript: string) => {
-      if (handleInputChange) {
-        const syntheticEvent = {
-          target: { value: transcript },
-        } as React.ChangeEvent<HTMLTextAreaElement>;
-        handleInputChange(syntheticEvent);
-      }
-    }, [handleInputChange]);
+    const onTranscriptChange = useCallback(
+      (transcript: string) => {
+        if (handleInputChange) {
+          const syntheticEvent = {
+            target: { value: transcript },
+          } as React.ChangeEvent<HTMLTextAreaElement>;
+          handleInputChange(syntheticEvent);
+        }
+      },
+      [handleInputChange],
+    );
 
     const { isListening, startListening, stopListening, abortListening } = useSpeechRecognition({
       onTranscriptChange,
@@ -198,10 +200,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 <div className="text-bolt-elements-textSecondary text-center max-w-chat mx-auto">
                   Browse these auto-generated apps for a place to start
                 </div>
-                <SearchInput
-                  onSearch={setFilterText}
-                  onChange={setPendingFilterText}
-                />
+                <SearchInput onSearch={setFilterText} />
                 <ExampleLibraryApps filterText={filterText} />
               </>
             )}

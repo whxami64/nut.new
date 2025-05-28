@@ -16,7 +16,7 @@ export function SignUpForm({ onToggleForm }: SignUpFormProps) {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -51,10 +51,8 @@ export function SignUpForm({ onToggleForm }: SignUpFormProps) {
 
   return (
     <>
-      <h2 className="text-2xl font-bold mb-6 text-bolt-elements-textPrimary text-center">
-        Create Account
-      </h2>
-      
+      <h2 className="text-2xl font-bold mb-6 text-bolt-elements-textPrimary text-center">Create Account</h2>
+
       <button
         type="button"
         onClick={handleGoogleSignIn}
@@ -130,13 +128,10 @@ export function SignUpForm({ onToggleForm }: SignUpFormProps) {
 
       <p className="mt-6 text-center text-bolt-elements-textSecondary">
         Already have an account?{' '}
-        <button
-          onClick={onToggleForm}
-          className="text-green-500 hover:text-green-600 font-medium bg-transparent"
-        >
+        <button onClick={onToggleForm} className="text-green-500 hover:text-green-600 font-medium bg-transparent">
           Sign In
         </button>
       </p>
     </>
   );
-} 
+}

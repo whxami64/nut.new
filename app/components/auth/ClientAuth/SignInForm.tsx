@@ -44,10 +44,8 @@ export function SignInForm({ onToggleForm }: SignInFormProps) {
 
   return (
     <>
-      <h2 className="text-2xl font-bold mb-6 text-bolt-elements-textPrimary text-center">
-        Welcome Back
-      </h2>
-      
+      <h2 className="text-2xl font-bold mb-6 text-bolt-elements-textPrimary text-center">Welcome Back</h2>
+
       <button
         type="button"
         onClick={handleGoogleSignIn}
@@ -109,13 +107,10 @@ export function SignInForm({ onToggleForm }: SignInFormProps) {
 
       <p className="mt-6 text-center text-bolt-elements-textSecondary">
         Don't have an account?{' '}
-        <button
-          onClick={onToggleForm}
-          className="text-green-500 hover:text-green-600 font-medium bg-transparent"
-        >
+        <button onClick={onToggleForm} className="text-green-500 hover:text-green-600 font-medium bg-transparent">
           Sign Up
         </button>
       </p>
     </>
   );
-} 
+}

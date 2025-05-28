@@ -2,12 +2,14 @@ import React from 'react';
 
 interface SearchInputProps {
   onSearch: (text: string) => void;
-  onChange: (text: string) => void;
 }
 
-export const SearchInput: React.FC<SearchInputProps> = ({ onSearch, onChange }) => {
+export const SearchInput: React.FC<SearchInputProps> = ({ onSearch }) => {
   return (
-    <div className="placeholder-bolt-elements-textTertiary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+    <div
+      className="placeholder-bolt-elements-textTertiary"
+      style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}
+    >
       <input
         type="text"
         placeholder="Search"
@@ -15,9 +17,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({ onSearch, onChange }) 
           if (event.key === 'Enter') {
             onSearch(event.currentTarget.value);
           }
-        }}
-        onChange={(event) => {
-          onChange(event.target.value);
         }}
         style={{
           width: '200px',
@@ -31,4 +30,4 @@ export const SearchInput: React.FC<SearchInputProps> = ({ onSearch, onChange }) 
       />
     </div>
   );
-}; 
+};

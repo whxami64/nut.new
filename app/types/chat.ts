@@ -1,6 +1,6 @@
 import type { Message, MessageImage, MessageText } from '~/lib/persistence/message';
 import type { ResumeChatInfo } from '~/lib/persistence/useChatHistory';
-import type { RejectChangeData } from '../components/chat/ApproveChange';
+import type { RejectChangeData } from '~/components/chat/ApproveChange';
 
 export interface ChatProps {
   initialMessages: Message[];
@@ -24,4 +24,4 @@ export interface UserMessage extends MessageText {
 export interface UserImageMessage extends MessageImage {
   role: 'user';
   type: 'image';
-} 
+}

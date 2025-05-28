@@ -1,11 +1,11 @@
 import React from 'react';
 import { classNames } from '~/utils/classNames';
-import FilePreview from '../../../FilePreview';
-import { ScreenshotStateManager } from '../../../ScreenshotStateManager';
+import FilePreview from '~/components/chat/FilePreview';
+import { ScreenshotStateManager } from '~/components/chat/ScreenshotStateManager';
 import { ClientOnly } from 'remix-utils/client-only';
-import ApproveChange from '../../../ApproveChange';
-import { MessageInput } from '../../../MessageInput/MessageInput';
-import styles from '../../BaseChat.module.scss';
+import ApproveChange from '~/components/chat/ApproveChange';
+import { MessageInput } from '~/components/chat/MessageInput/MessageInput';
+import styles from '~/components/chat/BaseChat/BaseChat.module.scss';
 
 interface ChatPromptContainerProps {
   chatStarted: boolean;
@@ -98,4 +98,4 @@ export const ChatPromptContainer: React.FC<ChatPromptContainerProps> = ({
       {!rejectFormOpen && <MessageInput {...messageInputProps} />}
     </div>
   );
-}; 
+};

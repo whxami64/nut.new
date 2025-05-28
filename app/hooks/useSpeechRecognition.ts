@@ -64,4 +64,4 @@ export const useSpeechRecognition = ({ onTranscriptChange }: UseSpeechRecognitio
     stopListening,
     abortListening,
   };
-}; 
+};

@@ -11,4 +11,4 @@ export const IntroSection: React.FC = () => {
       </p>
     </div>
   );
-}; 
+};

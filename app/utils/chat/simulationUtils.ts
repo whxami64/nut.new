@@ -18,9 +18,8 @@ export async function flushSimulationData() {
   simulationAddData(simulationData);
 }
 
-// Set up the interval in a separate function that can be called once
 export function setupSimulationInterval() {
   setInterval(async () => {
     flushSimulationData();
   }, 1000);
-} 
+}
