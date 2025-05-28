@@ -1,12 +1,15 @@
 import { ClientOnly } from 'remix-utils/client-only';
+import { Header } from '~/components/header/Header';
 import { Menu } from '~/components/sidebar/Menu.client';
+import BackgroundRays from '~/components/ui/BackgroundRays';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { PageContainer } from '~/layout/PageContainer';
 
 function AboutPage() {
   return (
     <TooltipProvider>
-      <PageContainer>
+      <div className="flex flex-col h-full min-h-screen w-full bg-bolt-elements-background-depth-1">
+        <BackgroundRays />
+        <Header />
         <ClientOnly>{() => <Menu />}</ClientOnly>
         <div className="max-w-3xl mx-auto px-6 py-12 prose dark:text-gray-200 prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-a:text-bolt-elements-accent">
           <h1 className="text-4xl font-bold mb-8 text-gray-900 dark:text-gray-200">About Nut</h1>
@@ -58,7 +61,7 @@ function AboutPage() {
             .
           </p>
         </div>
-      </PageContainer>
+      </div>
     </TooltipProvider>
   );
 }

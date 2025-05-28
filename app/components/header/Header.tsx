@@ -6,7 +6,7 @@ import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
 import { Feedback } from './Feedback';
 import { Suspense } from 'react';
-import { ClientAuth } from '~/components/auth/ClientAuth/ClientAuth';
+import { ClientAuth } from '~/components/auth/ClientAuth';
 import { DeployChatButton } from './DeployChatButton';
 import { DownloadButton } from './DownloadButton';
 
@@ -38,7 +38,7 @@ export function Header() {
 
       <div className="flex-1 flex items-center ">
         {chatStarted && (
-          <span className="px-4 truncate text-center text-bolt-elements-textPrimary">
+          <span className="flex-1 px-4 truncate text-center text-bolt-elements-textPrimary">
             <ClientOnly>{() => <ChatDescription />}</ClientOnly>
           </span>
         )}
