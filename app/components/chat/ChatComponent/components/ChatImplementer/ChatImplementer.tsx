@@ -195,8 +195,15 @@ const ChatImplementer = memo((props: ChatProps) => {
       newMessages.push(imageMessage);
     });
 
-    setMessages(newMessages);
+    await storeMessageHistory(newMessages);
+    
+    if (!chatStore.currentChat.get()) {
+      toast.error('Failed to initialize chat');
+      setPendingMessageId(undefined);
+      return;
+    }
 
+    setMessages(newMessages);
     setUploadedFiles([]);
     setImageDataList([]);
 
