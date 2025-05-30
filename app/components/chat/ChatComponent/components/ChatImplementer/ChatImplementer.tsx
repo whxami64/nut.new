@@ -1,22 +1,16 @@
-/*
- * @ts-nocheck
- * Preventing TS checks with files presented in the video for a better presentation.
- */
 import { useStore } from '@nanostores/react';
 import { useAnimate } from 'framer-motion';
 import { memo, useEffect, useRef, useState } from 'react';
-import { cssTransition, toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import { useSnapScroll } from '~/lib/hooks';
-import { handleChatTitleUpdate, useChatHistory, type ResumeChatInfo } from '~/lib/persistence';
+import { handleChatTitleUpdate, type ResumeChatInfo } from '~/lib/persistence';
 import { database } from '~/lib/persistence/chats';
 import { chatStore } from '~/lib/stores/chat';
 import { cubicEasingFn } from '~/utils/easings';
-import { renderLogger } from '~/utils/logger';
-import { BaseChat } from './BaseChat';
+import { BaseChat } from '~/components/chat/BaseChat/BaseChat';
 import Cookies from 'js-cookie';
 import { useSearchParams } from '@remix-run/react';
 import {
-  simulationAddData,
   simulationFinishData,
   simulationRepositoryUpdated,
   sendChatMessage,
@@ -24,95 +18,20 @@ import {
   abortChatMessage,
   resumeChatMessage,
 } from '~/lib/replay/ChatManager';
-import { getIFrameSimulationData } from '~/lib/replay/Recording';
-import { getCurrentIFrame } from '~/components/workbench/Preview';
 import { getCurrentMouseData } from '~/components/workbench/PointSelector';
 import { anthropicNumFreeUsesCookieName, maxFreeUses } from '~/utils/freeUses';
 import { ChatMessageTelemetry, pingTelemetry } from '~/lib/hooks/pingTelemetry';
-import type { RejectChangeData } from './ApproveChange';
-import { assert, generateRandomId } from '~/lib/replay/ReplayProtocolClient';
+import type { RejectChangeData } from '~/components/chat/ApproveChange';
+import { generateRandomId } from '~/lib/replay/ReplayProtocolClient';
 import { getMessagesRepositoryId, getPreviousRepositoryId, type Message } from '~/lib/persistence/message';
 import { useAuthStatus } from '~/lib/stores/auth';
 import { debounce } from '~/utils/debounce';
 import { supabaseSubmitFeedback } from '~/lib/supabase/feedback';
 import { supabaseAddRefund } from '~/lib/supabase/peanuts';
-
-const toastAnimation = cssTransition({
-  enter: 'animated fadeInRight',
-  exit: 'animated fadeOutRight',
-});
-
-let gLastChatMessages: Message[] | undefined;
-
-export function getLastChatMessages() {
-  return gLastChatMessages;
-}
-
-async function flushSimulationData() {
-  //console.log("FlushSimulationData");
-
-  const iframe = getCurrentIFrame();
-
-  if (!iframe) {
-    return;
-  }
-
-  const simulationData = await getIFrameSimulationData(iframe);
-
-  if (!simulationData.length) {
-    return;
-  }
-
-  //console.log("HaveSimulationData", simulationData.length);
-
-  // Add the simulation data to the chat.
-  simulationAddData(simulationData);
-}
-
-setInterval(async () => {
-  flushSimulationData();
-}, 1000);
-
-export function Chat() {
-  renderLogger.trace('Chat');
-
-  const { ready, initialMessages, resumeChat, storeMessageHistory } = useChatHistory();
-
-  return (
-    <>
-      {ready && (
-        <ChatImpl initialMessages={initialMessages} resumeChat={resumeChat} storeMessageHistory={storeMessageHistory} />
-      )}
-      <ToastContainer
-        closeButton={({ closeToast }) => {
-          return (
-            <button className="Toastify__close-button" onClick={closeToast}>
-              <div className="i-ph:x text-lg" />
-            </button>
-          );
-        }}
-        icon={({ type }) => {
-          /**
-           * @todo Handle more types if we need them. This may require extra color palettes.
-           */
-          switch (type) {
-            case 'success': {
-              return <div className="i-ph:check-bold text-bolt-elements-icon-success text-2xl" />;
-            }
-            case 'error': {
-              return <div className="i-ph:warning-circle-bold text-bolt-elements-icon-error text-2xl" />;
-            }
-          }
-
-          return undefined;
-        }}
-        position="bottom-right"
-        pauseOnFocusLoss
-        transition={toastAnimation}
-      />
-    </>
-  );
-}
+import mergeResponseMessage from '~/components/chat/ChatComponent/functions/mergeResponseMessages';
+import flushSimulationData from '~/components/chat/ChatComponent/functions/flushSimulation';
+import getRewindMessageIndexAfterReject from '~/components/chat/ChatComponent/functions/getRewindMessageIndexAfterReject';
+import flashScreen from '~/components/chat/ChatComponent/functions/flashScreen';
 
 interface ChatProps {
   initialMessages: Message[];
@@ -128,39 +47,13 @@ async function clearActiveChat() {
   gActiveChatMessageTelemetry = undefined;
 }
 
-function mergeResponseMessage(msg: Message, messages: Message[]): Message[] {
-  const lastMessage = messages[messages.length - 1];
-  if (lastMessage.id == msg.id) {
-    messages.pop();
-    assert(lastMessage.type == 'text', 'Last message must be a text message');
-    assert(msg.type == 'text', 'Message must be a text message');
-    messages.push({
-      ...msg,
-      content: lastMessage.content + msg.content,
-    });
-  } else {
-    messages.push(msg);
-  }
-  return messages;
+let gLastChatMessages: Message[] | undefined;
+
+export function getLastChatMessages() {
+  return gLastChatMessages;
 }
 
-// Get the index of the last message that will be present after rewinding.
-// This is the last message which is either a user message or has a repository change.
-function getRewindMessageIndexAfterReject(messages: Message[], messageId: string): number {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const { id, role, repositoryId } = messages[i];
-    if (role == 'user') {
-      return i;
-    }
-    if (repositoryId && id != messageId) {
-      return i;
-    }
-  }
-  console.error('No rewind message found', messages, messageId);
-  return -1;
-}
-
-export const ChatImpl = memo((props: ChatProps) => {
+const ChatImplementer = memo((props: ChatProps) => {
   const { initialMessages, resumeChat: initialResumeChat, storeMessageHistory } = props;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -169,22 +62,12 @@ export const ChatImpl = memo((props: ChatProps) => {
   const [imageDataList, setImageDataList] = useState<string[]>([]); // Move here
   const [searchParams] = useSearchParams();
   const { isLoggedIn } = useAuthStatus();
-
-  // Input currently in the textarea.
   const [input, setInput] = useState('');
 
-  /*
-   * This is set when the user has triggered a chat message and the response hasn't finished
-   * being generated.
-   */
   const [pendingMessageId, setPendingMessageId] = useState<string | undefined>(undefined);
 
-  // Last status we heard for the pending message.
   const [pendingMessageStatus, setPendingMessageStatus] = useState('');
 
-  // If we are listening to responses from a chat started in an earlier session,
-  // this will be set. This is equivalent to having a pending message but is
-  // handled differently.
   const [resumeChat, setResumeChat] = useState<ResumeChatInfo | undefined>(initialResumeChat);
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -201,7 +84,6 @@ export const ChatImpl = memo((props: ChatProps) => {
     }
   }, [searchParams]);
 
-  // Load any repository in the initial messages.
   useEffect(() => {
     const repositoryId = getMessagesRepositoryId(initialMessages);
 
@@ -315,7 +197,6 @@ export const ChatImpl = memo((props: ChatProps) => {
 
     setMessages(newMessages);
 
-    // Add file cleanup here
     setUploadedFiles([]);
     setImageDataList([]);
 
@@ -336,7 +217,6 @@ export const ChatImpl = memo((props: ChatProps) => {
       newMessages = mergeResponseMessage(msg, [...newMessages]);
       setMessages(newMessages);
 
-      // Update the repository as soon as it has changed.
       const responseRepositoryId = getMessagesRepositoryId(newMessages);
 
       if (responseRepositoryId && existingRepositoryId != responseRepositoryId) {
@@ -417,11 +297,6 @@ export const ChatImpl = memo((props: ChatProps) => {
 
       let newMessages = messages;
 
-      // The response messages we get may overlap with the ones we already have.
-      // Look for this and remove any existing message when we receive the first
-      // piece of a response message.
-      //
-      // Messages we have already received a portion of a response for.
       const hasReceivedResponse = new Set<string>();
 
       const addResponseMessage = (msg: Message) => {
@@ -439,7 +314,6 @@ export const ChatImpl = memo((props: ChatProps) => {
         newMessages = mergeResponseMessage(msg, [...newMessages]);
         setMessages(newMessages);
 
-        // Update the repository as soon as it has changed.
         const responseRepositoryId = getMessagesRepositoryId(newMessages);
 
         if (responseRepositoryId && existingRepositoryId != responseRepositoryId) {
@@ -492,28 +366,6 @@ export const ChatImpl = memo((props: ChatProps) => {
     })();
   }, [initialResumeChat]);
 
-  const flashScreen = async () => {
-    const flash = document.createElement('div');
-    flash.style.position = 'fixed';
-    flash.style.top = '0';
-    flash.style.left = '0';
-    flash.style.width = '100%';
-    flash.style.height = '100%';
-    flash.style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
-    flash.style.zIndex = '9999';
-    flash.style.pointerEvents = 'none';
-    document.body.appendChild(flash);
-
-    // Fade out and remove after 500ms
-    setTimeout(() => {
-      flash.style.transition = 'opacity 0.5s';
-      flash.style.opacity = '0';
-      setTimeout(() => {
-        document.body.removeChild(flash);
-      }, 500);
-    }, 200);
-  };
-
   const onApproveChange = async (messageId: string) => {
     console.log('ApproveChange', messageId);
 
@@ -539,8 +391,6 @@ export const ChatImpl = memo((props: ChatProps) => {
   const onRejectChange = async (messageId: string, data: RejectChangeData) => {
     console.log('RejectChange', messageId, data);
 
-    // Find the last message that will be present after rewinding. This is the
-    // last message which is either a user message or has a repository change.
     const messageIndex = getRewindMessageIndexAfterReject(messages, messageId);
 
     if (messageIndex < 0) {
@@ -621,3 +471,5 @@ export const ChatImpl = memo((props: ChatProps) => {
     />
   );
 });
+
+export default ChatImplementer;
