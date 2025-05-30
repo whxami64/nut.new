@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { classNames } from '~/utils/classNames';
-import { TEXTAREA_MIN_HEIGHT } from './BaseChat';
+import { TEXTAREA_MIN_HEIGHT } from './BaseChat/BaseChat';
 
 export interface RejectChangeData {
   explanation: string;
