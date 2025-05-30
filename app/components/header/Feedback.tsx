@@ -2,7 +2,7 @@ import { toast } from 'react-toastify';
 import ReactModal from 'react-modal';
 import { useState } from 'react';
 import { supabaseSubmitFeedback } from '~/lib/supabase/feedback';
-import { getLastChatMessages } from '~/utils/chat/messageUtils';
+import { getLastChatMessages } from '~/components/chat/Chat.client';
 
 ReactModal.setAppElement('#root');
 
