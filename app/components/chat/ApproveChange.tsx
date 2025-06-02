@@ -58,29 +58,29 @@ const ApproveChange: React.FC<ApproveChangeProps> = ({ rejectFormOpen, setReject
               maxHeight: 400,
             }}
             placeholder="What's wrong with the changes?"
-            translate="no"
+            translate='no'
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full mb-2">
+        <div className='flex items-center gap-2 w-full mb-2'>
           <input
-            type="checkbox"
-            id="share-project"
+            type='checkbox'
+            id='share-project'
             checked={shareProject}
             onChange={(event) => setShareProject(event.target.checked)}
             className="rounded border-red-300 text-red-500 focus:ring-red-500"
           />
-          <label htmlFor="share-project" className="text-sm text-red-600">
+          <label htmlFor='share-project' className='text-sm text-red-600'>
             Share with Nut team
           </label>
         </div>
 
-        <div className="flex items-center gap-1 w-full h-[30px] pt-2">
+        <div className='flex items-center gap-1 w-full h-[30px] pt-2'>
           <button
             onClick={() => performReject()}
-            className="flex-1 h-[30px] flex justify-center items-center bg-red-100 border border-red-500 text-red-500 hover:bg-red-200 hover:text-red-600 transition-colors rounded"
-            aria-label="Revert changes"
-            title="Revert changes"
+            className='flex-1 h-[30px] flex justify-center items-center bg-red-100 border border-red-500 text-red-500 hover:bg-red-200 hover:text-red-600 transition-colors rounded'
+            aria-label='Revert changes'
+            title='Revert changes'
           >
             <div className="i-ph:arrow-arc-left-bold"></div>
           </button>
@@ -90,22 +90,22 @@ const ApproveChange: React.FC<ApproveChangeProps> = ({ rejectFormOpen, setReject
   }
 
   return (
-    <div className="flex items-center gap-1 w-full h-[30px] mb-2">
+    <div className='flex items-center gap-1 w-full h-[30px] mb-2'>
       <button
         onClick={() => setRejectFormOpen(true)}
-        className="flex-1 h-[30px] flex justify-center items-center bg-red-100 border border-red-500 text-red-500 hover:bg-red-200 hover:text-red-600 transition-colors rounded"
-        aria-label="Reject change"
-        title="Reject change"
+        className='flex-1 h-[30px] flex justify-center items-center bg-red-100 border border-red-500 text-red-500 hover:bg-red-200 hover:text-red-600 transition-colors rounded'
+        aria-label='Reject change'
+        title='Reject change'
       >
-        <div className="i-ph:thumbs-down-bold"></div>
+        <div className='i-ph:thumbs-down-bold'></div>
       </button>
       <button
         onClick={onApprove}
-        className="flex-1 h-[30px] flex justify-center items-center bg-green-100 border border-green-500 text-green-500 hover:bg-green-200 hover:text-green-600 transition-colors rounded"
-        aria-label="Approve change"
-        title="Approve change"
+        className='flex-1 h-[30px] flex justify-center items-center bg-green-100 border border-green-500 text-green-500 hover:bg-green-200 hover:text-green-600 transition-colors rounded'
+        aria-label='Approve change'
+        title='Approve change'
       >
-        <div className="i-ph:thumbs-up-bold"></div>
+        <div className='i-ph:thumbs-up-bold'></div>
       </button>
     </div>
   );

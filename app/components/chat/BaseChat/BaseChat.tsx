@@ -2,7 +2,7 @@
  * @ts-nocheck
  * Preventing TS checks with files presented in the video for a better presentation.
  */
-import React, { type RefCallback, useCallback } from 'react';
+import React, { type RefCallback, useCallback, useState } from 'react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { Workbench } from '~/components/workbench/Workbench.client';
@@ -11,14 +11,13 @@ import { Messages } from '~/components/chat/Messages.client';
 import { type Message } from '~/lib/persistence/message';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { IntroSection } from '~/components/chat/BaseChat/components/IntroSection/IntroSection';
-import { SearchInput } from '~/components/chat/SearchInput/SearchInput';
 import { ChatPromptContainer } from '~/components/chat/BaseChat/components/ChatPromptContainer/ChatPromptContainer';
 import { useSpeechRecognition } from '~/hooks/useSpeechRecognition';
 import styles from './BaseChat.module.scss';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
-import { ExampleLibraryApps } from '~/components/app-library/ExampleLibraryApps';
 import type { RejectChangeData } from '~/components/chat/ApproveChange';
 import { type MessageInputProps } from '~/components/chat/MessageInput/MessageInput';
+import { Arboretum } from './components/Arboretum/Arboretum';
 
 export const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -74,8 +73,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     ref,
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
-    const [rejectFormOpen, setRejectFormOpen] = React.useState(false);
-    const [filterText, setFilterText] = React.useState('');
+    const [rejectFormOpen, setRejectFormOpen] = useState(false);
+    const [showArboretum, setShowArboretum] = useState(false);
 
     const onTranscriptChange = useCallback(
       (transcript: string) => {
@@ -168,7 +167,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   return chatStarted ? (
                     <Messages
                       ref={messageRef}
-                      className="flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto"
+                      className='flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto'
                       messages={messages}
                       hasPendingMessage={hasPendingMessage}
                       pendingMessageStatus={pendingMessageStatus}
@@ -199,14 +198,16 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   }
                   handleSendMessage(event, messageInput);
                 })}
-                <div className="text-2xl lg:text-4xl font-bold text-bolt-elements-textPrimary mt-8 mb-4 animate-fade-in text-center max-w-chat mx-auto">
-                  Arboretum
-                </div>
-                <div className="text-bolt-elements-textSecondary text-center max-w-chat mx-auto">
-                  Browse these auto-generated apps for a place to start
-                </div>
-                <SearchInput onSearch={setFilterText} />
-                <ExampleLibraryApps filterText={filterText} />
+                {showArboretum ? (
+                  <Arboretum onHide={() => setShowArboretum(false)} />
+                ) : (
+                  <button
+                    className='text-bolt-elements-textPrimary text-center mx-auto bg-transparent p-2 rounded-md mt-10'
+                    onClick={() => setShowArboretum(true)}
+                  >
+                    Show Arboretum
+                  </button>
+                )}
               </>
             )}
           </div>

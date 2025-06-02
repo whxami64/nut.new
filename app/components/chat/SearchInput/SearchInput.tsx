@@ -7,12 +7,12 @@ interface SearchInputProps {
 export const SearchInput: React.FC<SearchInputProps> = ({ onSearch }) => {
   return (
     <div
-      className="placeholder-bolt-elements-textTertiary"
+      className='placeholder-bolt-elements-textTertiary'
       style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}
     >
       <input
-        type="text"
-        placeholder="Search"
+        type='text'
+        placeholder='Search'
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             onSearch(event.currentTarget.value);

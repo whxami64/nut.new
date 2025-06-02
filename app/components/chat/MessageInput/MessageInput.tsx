@@ -181,10 +181,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         )}
       </ClientOnly>
-      <div className="flex justify-between items-center text-sm p-4 pt-2">
-        <div className="flex gap-1 items-center">
-          <IconButton title="Upload file" className="transition-all" onClick={handleFileUpload}>
-            <div className="i-ph:paperclip text-xl"></div>
+      <div className='flex justify-between items-center text-sm p-4 pt-2'>
+        <div className='flex gap-1 items-center'>
+          <IconButton title='Upload file' className='transition-all' onClick={handleFileUpload}>
+            <div className='i-ph:paperclip text-xl'></div>
           </IconButton>
 
           <SpeechRecognitionButton
@@ -195,9 +195,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
         {input.length > 3 ? (
-          <div className="text-xs text-bolt-elements-textTertiary">
-            Use <kbd className="kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2">Shift</kbd> +{' '}
-            <kbd className="kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2">Return</kbd> a new line
+          <div className='text-xs text-bolt-elements-textTertiary'>
+            Use <kbd className='kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2'>Shift</kbd> +{' '}
+            <kbd className='kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2'>Return</kbd> a new line
           </div>
         ) : null}
       </div>
