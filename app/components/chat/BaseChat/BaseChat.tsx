@@ -18,6 +18,7 @@ import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import type { RejectChangeData } from '~/components/chat/ApproveChange';
 import { type MessageInputProps } from '~/components/chat/MessageInput/MessageInput';
 import { Arboretum } from './components/Arboretum/Arboretum';
+import { useArboretumVisibility } from '~/lib/stores/settings';
 
 export const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -74,7 +75,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [rejectFormOpen, setRejectFormOpen] = useState(false);
-    const [showArboretum, setShowArboretum] = useState(false);
+    const { isArboretumVisible } = useArboretumVisibility();
 
     const onTranscriptChange = useCallback(
       (transcript: string) => {
@@ -198,16 +199,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   }
                   handleSendMessage(event, messageInput);
                 })}
-                {showArboretum ? (
-                  <Arboretum onHide={() => setShowArboretum(false)} />
-                ) : (
-                  <button
-                    className="text-bolt-elements-textPrimary text-center mx-auto bg-transparent p-2 rounded-md mt-10"
-                    onClick={() => setShowArboretum(true)}
-                  >
-                    Show Arboretum
-                  </button>
+                {isArboretumVisible && (
+                  <Arboretum />
                 )}
+                
               </>
             )}
           </div>
