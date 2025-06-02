@@ -17,7 +17,7 @@ type TabType = 'data' | 'apiKeys' | 'features' | 'debug' | 'event-logs' | 'conne
 
 export const SettingsWindow = ({ open, onClose }: SettingsProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('data');
-  const { toggleArboretum } = useArboretumVisibility();
+  const { isArboretumVisible, toggleArboretum } = useArboretumVisibility();
 
   const tabs: { id: TabType; label: string; icon: string; component?: ReactElement }[] = [
     { id: 'connection', label: 'Connection', icon: 'i-ph:link', component: <ConnectionsTab /> },
@@ -67,7 +67,7 @@ export const SettingsWindow = ({ open, onClose }: SettingsProps) => {
                   className="text-bolt-elements-textPrimary text-center mx-auto p-2 rounded-md mt-10"
                   onClick={toggleArboretum}
                 >
-                  Toggle Arboretum
+                  {isArboretumVisible ? 'Hide Arboretum' : 'Show Arboretum'}
                 </button>
               </div>
 
