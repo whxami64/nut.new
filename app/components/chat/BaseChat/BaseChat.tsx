@@ -199,10 +199,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   }
                   handleSendMessage(event, messageInput);
                 })}
-                {isArboretumVisible && (
-                  <Arboretum />
-                )}
-                
+                {isArboretumVisible && <Arboretum />}
               </>
             )}
           </div>

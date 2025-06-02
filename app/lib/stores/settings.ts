@@ -7,9 +7,9 @@ export const showArboretumStore = atom<boolean>(false);
 // Create a hook for easier usage in React components
 export function useArboretumVisibility() {
   const isVisible = useStore(showArboretumStore);
-  
+
   return {
     isArboretumVisible: isVisible,
-    toggleArboretum: () => showArboretumStore.set(!isVisible)
+    toggleArboretum: () => showArboretumStore.set(!isVisible),
   };
 }
