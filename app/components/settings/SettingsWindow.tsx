@@ -6,6 +6,7 @@ import { DialogTitle, dialogVariants, dialogBackdropVariants } from '~/component
 import { IconButton } from '~/components/ui/IconButton';
 import styles from './Settings.module.scss';
 import ConnectionsTab from './connections/ConnectionsTab';
+import { useArboretumVisibility } from '~/lib/stores/settings';
 
 interface SettingsProps {
   open: boolean;
@@ -16,6 +17,7 @@ type TabType = 'data' | 'apiKeys' | 'features' | 'debug' | 'event-logs' | 'conne
 
 export const SettingsWindow = ({ open, onClose }: SettingsProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('data');
+  const { isArboretumVisible, toggleArboretum } = useArboretumVisibility();
 
   const tabs: { id: TabType; label: string; icon: string; component?: ReactElement }[] = [
     { id: 'connection', label: 'Connection', icon: 'i-ph:link', component: <ConnectionsTab /> },
@@ -61,6 +63,12 @@ export const SettingsWindow = ({ open, onClose }: SettingsProps) => {
                     {tab.label}
                   </button>
                 ))}
+                <button
+                  className="text-bolt-elements-textPrimary text-center mx-auto p-2 rounded-md mt-10"
+                  onClick={toggleArboretum}
+                >
+                  {isArboretumVisible ? 'Hide Arboretum' : 'Show Arboretum'}
+                </button>
               </div>
 
               <div className="flex-1 flex flex-col p-8 pt-10 bg-bolt-elements-background-depth-2">
