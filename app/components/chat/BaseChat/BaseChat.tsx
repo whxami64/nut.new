@@ -167,7 +167,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   return chatStarted ? (
                     <Messages
                       ref={messageRef}
-                      className='flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto'
+                      className="flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto"
                       messages={messages}
                       hasPendingMessage={hasPendingMessage}
                       pendingMessageStatus={pendingMessageStatus}
@@ -202,7 +202,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   <Arboretum onHide={() => setShowArboretum(false)} />
                 ) : (
                   <button
-                    className='text-bolt-elements-textPrimary text-center mx-auto bg-transparent p-2 rounded-md mt-10'
+                    className="text-bolt-elements-textPrimary text-center mx-auto bg-transparent p-2 rounded-md mt-10"
                     onClick={() => setShowArboretum(true)}
                   >
                     Show Arboretum
