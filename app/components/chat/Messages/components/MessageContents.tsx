@@ -2,7 +2,7 @@
  * @ts-nocheck
  * Preventing TS checks with files presented in the video for a better presentation.
  */
-import { Markdown } from './Markdown';
+import { Markdown } from '~/components/chat/Markdown';
 import type { Message } from '~/lib/persistence/message';
 
 interface MessageContentsProps {

@@ -7,7 +7,7 @@ import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
-import { Messages } from '~/components/chat/Messages.client';
+import { Messages } from '~/components/chat/Messages/Messages.client';
 import { type Message } from '~/lib/persistence/message';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { IntroSection } from '~/components/chat/BaseChat/components/IntroSection/IntroSection';
@@ -168,7 +168,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   return chatStarted ? (
                     <Messages
                       ref={messageRef}
-                      className="flex flex-col w-full flex-1 max-w-chat pb-6 mx-auto z-1 overflow-y-auto"
                       messages={messages}
                       hasPendingMessage={hasPendingMessage}
                       pendingMessageStatus={pendingMessageStatus}
