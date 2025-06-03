@@ -7,7 +7,9 @@ interface JumpToBottomProps {
 }
 
 export const JumpToBottom: React.FC<JumpToBottomProps> = ({ visible, onClick }) => {
-  if (!visible) return null;
+  if (!visible) {
+    return null;
+  }
 
   return (
     <div className="absolute left-0 right-0 bottom-5 flex justify-center pointer-events-none">
@@ -21,7 +23,7 @@ export const JumpToBottom: React.FC<JumpToBottomProps> = ({ visible, onClick }) 
           'hover:border-white hover:border-1',
           'transition-all duration-200 shadow-lg',
           'focus:outline-none focus:ring-2 focus:ring-gray-700',
-          'pointer-events-auto'
+          'pointer-events-auto',
         )}
         aria-label="Jump to bottom"
       >
@@ -41,4 +43,4 @@ export const JumpToBottom: React.FC<JumpToBottomProps> = ({ visible, onClick }) 
       </button>
     </div>
   );
-}; 
+};

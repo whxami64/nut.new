@@ -165,31 +165,35 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>(
     const setRefs = useCallback(
       (element: HTMLDivElement | null) => {
         containerRef.current = element;
-        
+
         if (typeof ref === 'function') {
           ref(element);
         } else if (ref) {
           ref.current = element;
         }
       },
-      [ref]
+      [ref],
     );
 
     const handleScroll = () => {
-      if (!containerRef.current) return;
-      
+      if (!containerRef.current) {
+        return;
+      }
+
       const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      
+
       setShowJumpToBottom(distanceFromBottom > 50);
     };
 
     const scrollToBottom = () => {
-      if (!containerRef.current) return;
-      
+      if (!containerRef.current) {
+        return;
+      }
+
       containerRef.current.scrollTo({
         top: containerRef.current.scrollHeight,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     };
 
@@ -199,6 +203,7 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>(
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
       }
+      return undefined;
     }, []);
 
     useEffect(() => {
@@ -294,7 +299,8 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>(
           data-testid="message"
           key={index}
           className={classNames('flex gap-4 p-6 w-full rounded-[calc(0.75rem-1px)]', {
-            'bg-bolt-elements-messages-background': isUserMessage || !hasPendingMessage || (hasPendingMessage && !isLast),
+            'bg-bolt-elements-messages-background':
+              isUserMessage || !hasPendingMessage || (hasPendingMessage && !isLast),
             'bg-gradient-to-b from-bolt-elements-messages-background from-30% to-transparent':
               hasPendingMessage && isLast,
             'mt-4': !isFirst,
@@ -367,10 +373,7 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>(
       <div className="relative flex-1 min-h-0">
         <div
           ref={setRefs}
-          className={classNames(
-            'absolute inset-0 overflow-y-auto',
-            'flex flex-col w-full max-w-chat pb-6 mx-auto',
-          )}
+          className={classNames('absolute inset-0 overflow-y-auto', 'flex flex-col w-full max-w-chat pb-6 mx-auto')}
         >
           {messages.length > 0 ? messages.map(renderMessage) : null}
           {hasPendingMessage && (
@@ -383,4 +386,5 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>(
         <JumpToBottom visible={showJumpToBottom} onClick={scrollToBottom} />
       </div>
     );
-});
+  },
+);
