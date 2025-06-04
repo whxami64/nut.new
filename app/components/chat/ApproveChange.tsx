@@ -71,7 +71,7 @@ const ApproveChange: React.FC<ApproveChangeProps> = ({ rejectFormOpen, setReject
             className="rounded border-red-300 text-red-500 focus:ring-red-500"
           />
           <label htmlFor="share-project" className="text-sm text-red-600">
-            Share with Nut team
+            Share project details with Nut team
           </label>
         </div>
 
