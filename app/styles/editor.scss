@@ -1,0 +1,143 @@
+:root {
+  --cm-backgroundColor: var(--bolt-elements-editor-backgroundColor, var(--bolt-elements-bg-depth-1));
+  --cm-textColor: var(--bolt-elements-editor-textColor, var(--bolt-elements-textPrimary));
+
+  /* Text Rendering */
+  --cm-text-rendering: geometricPrecision;
+  --cm-font-smoothing: none;
+  --cm-font-smoothing-moz: grayscale;
+  --cm-font-feature-settings: "liga" 0, "calt" 0;
+
+  /* Editor Font */
+  --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+  
+  /* Gutter */
+  --cm-gutter-backgroundColor: var(--bolt-elements-editor-gutter-backgroundColor, var(--cm-backgroundColor));
+  --cm-gutter-textColor: var(--bolt-elements-editor-gutter-textColor, var(--bolt-elements-textSecondary));
+  --cm-gutter-activeLineTextColor: var(--bolt-elements-editor-gutter-activeLineTextColor, var(--cm-gutter-textColor));
+
+  /* Fold Gutter */
+  --cm-foldGutter-textColor: var(--bolt-elements-editor-foldGutter-textColor, var(--cm-gutter-textColor));
+  --cm-foldGutter-textColorHover: var(--bolt-elements-editor-foldGutter-textColorHover, var(--cm-gutter-textColor));
+
+  /* Active Line */
+  --cm-activeLineBackgroundColor: var(--bolt-elements-editor-activeLineBackgroundColor, rgba(224, 231, 235, 0.15));
+
+  /* Cursor */
+  --cm-cursor-width: 2px;
+  --cm-cursor-backgroundColor: var(--bolt-elements-editor-cursorColor, var(--bolt-elements-textSecondary));
+
+  /* Matching Brackets */
+  --cm-matching-bracket: var(--bolt-elements-editor-matchingBracketBackgroundColor, rgba(50, 140, 130, 0.15));
+
+  /* Selection */
+  --cm-selection-backgroundColorFocused: var(--bolt-elements-editor-selection-backgroundColor, rgba(66, 180, 255, 0.2));
+  --cm-selection-backgroundOpacityFocused: var(--bolt-elements-editor-selection-backgroundOpacity, 1);
+  --cm-selection-backgroundColorBlured: var(--bolt-elements-editor-selection-inactiveBackgroundColor, rgba(201, 233, 255, 0.2));
+  --cm-selection-backgroundOpacityBlured: var(--bolt-elements-editor-selection-inactiveBackgroundOpacity, 1);
+
+  // ... rest of existing code ...
+}
+
+/* Mobile editor optimizations */
+.mobile-editor {
+  .cm-content {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 6px;
+  }
+  
+  .cm-lineNumbers {
+    font-size: 10px;
+    padding-right: 6px;
+  }
+}
+
+/* Compact file tree styles for mobile */
+.file-tree-compact {
+  ul {
+    padding-left: 0.75rem !important;
+  }
+  
+  li {
+    margin-top: 1px;
+    margin-bottom: 1px;
+  }
+  
+  button.folder-button,
+  button.file-button {
+    padding: 1px 4px !important;
+    border-radius: 3px;
+    
+    &:hover {
+      background-color: var(--bolt-elements-background-depth-2);
+    }
+    
+    /* Make currently selected file more visible */
+    &.selected {
+      background-color: var(--bolt-brand-primary-transparent);
+      font-weight: 500;
+    }
+  }
+  
+  /* Improve icon spacing */
+  .folder-icon, .file-icon {
+    margin-right: 3px;
+  }
+  
+  /* Improve folder collapse indicators */
+  .folder-collapse-indicator {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center;
+    transition: transform 0.15s ease;
+  }
+  
+  /* Add visual indicators for file types */
+  .file-icon.js, .file-icon.jsx, .file-icon.ts, .file-icon.tsx {
+    color: #f0db4f;
+  }
+  .file-icon.html, .file-icon.htm {
+    color: #e44d26;
+  }
+  .file-icon.css, .file-icon.scss, .file-icon.less {
+    color: #264de4;
+  }
+}
+
+/* iOS-specific memory optimizations */
+.ios-editor {
+  /* Reduce rendering complexity */
+  .cm-content {
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: none;
+  }
+  
+  /* Reduce highlight and animation effects */
+  .cm-activeLine,
+  .cm-activeLineGutter {
+    background-color: transparent !important;
+  }
+  
+  /* Simplify syntax highlighting for iOS */
+  .cm-matchingBracket {
+    background-color: transparent !important;
+    text-decoration: underline;
+  }
+  
+  /* Reduce shadow effects */
+  .cm-tooltip {
+    box-shadow: none;
+    border: 1px solid var(--bolt-elements-borderColor);
+  }
+  
+  /* Optimize scrolling performance */
+  .cm-scroller {
+    -webkit-overflow-scrolling: auto;
+    scroll-behavior: auto;
+  }
+}

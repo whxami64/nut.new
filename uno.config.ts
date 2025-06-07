@@ -241,10 +241,15 @@ export default defineConfig({
     }),
     presetIcons({
       warn: true,
+      scale: 1.2,
+      cdn: 'https://esm.sh/', // Use ESM CDN for icon loading
+      extraProperties: {
+        'display': 'inline-block',
+        'vertical-align': 'middle'
+      },
       collections: {
         ...customIconCollection,
       },
-      unit: 'em',
     }),
   ],
 });

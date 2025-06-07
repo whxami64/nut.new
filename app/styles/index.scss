@@ -1,11 +1,13 @@
-@use 'variables.scss';
-@use 'z-index.scss';
-@use 'animations.scss';
-@use 'components/terminal.scss';
-@use 'components/resize-handle.scss';
-@use 'components/code.scss';
-@use 'components/editor.scss';
-@use 'components/toast.scss';
+@import './variables.scss';
+@import './z-index.scss';
+@import './animations.scss';
+@import './typography.scss';
+@import './components/terminal.scss';
+@import './components/resize-handle.scss';
+@import './components/code.scss';
+@import './components/editor.scss';
+@import './components/toast.scss';
+@import './components/starfield.scss';
 
 html,
 body {
@@ -13,9 +15,27 @@ body {
   width: 100%;
 }
 
-:root {
-  --gradient-opacity: 0.8;
-  --primary-color: rgba(71, 181, 87, var(--gradient-opacity));
-  --secondary-color: rgba(16, 87, 27, var(--gradient-opacity));
-  --accent-color: rgba(25, 99, 45, var(--gradient-opacity));
+/* Custom Scrollbar Styles for Dark Theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bolt-elements-bg-depth-2, theme('colors.gray.900')); /* Match menu background, fallback if variable not found */
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bolt-elements-borderColor, theme('colors.alpha.white.10')); /* Fallback */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bolt-elements-borderColorActive, theme('colors.accent.500')); /* Fallback */
+}
+
+/* For Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bolt-elements-borderColor, theme('colors.alpha.white.10')) var(--bolt-elements-bg-depth-2, theme('colors.gray.900')); /* thumb and track (track matches menu background) */
 }

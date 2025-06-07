@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react';
-import useViewport from '~/lib/hooks';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
@@ -8,9 +7,7 @@ interface HeaderActionButtonsProps {}
 
 export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const showWorkbench = useStore(workbenchStore.showWorkbench);
-  const showChat = useStore(chatStore.showChat);
-
-  const isSmallViewport = useViewport(1024);
+  const { showChat } = useStore(chatStore);
 
   const canHideChat = showWorkbench || !showChat;
 
@@ -19,10 +16,10 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
       <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden">
         <Button
           active={showChat}
-          disabled={!canHideChat || isSmallViewport} // expand button is disabled on mobile as it's not needed
+          disabled={!canHideChat}
           onClick={() => {
             if (canHideChat) {
-              chatStore.showChat.set(!showChat);
+              chatStore.setKey('showChat', !showChat);
             }
           }}
         >
@@ -33,7 +30,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
           active={showWorkbench}
           onClick={() => {
             if (showWorkbench && !showChat) {
-              chatStore.showChat.set(true);
+              chatStore.setKey('showChat', true);
             }
 
             workbenchStore.showWorkbench.set(!showWorkbench);
